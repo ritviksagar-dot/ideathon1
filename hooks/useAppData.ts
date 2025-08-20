@@ -45,22 +45,33 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
           if (mentorsResult.error) throw mentorsResult.error;
           setMentors(mentorsResult.data || []);
         } else {
-          // Mentor: Fetch only assigned reviews and their associated teams in one query
-          const { data: reviewsWithTeams, error: reviewsError } = await supabaseClient
+          // Mentor: Fetch assigned reviews first, then their associated teams.
+          // This avoids a join that requires a DB relationship to be defined.
+          const { data: mentorReviews, error: reviewsError } = await supabaseClient
             .from('reviews')
-            .select('*, team:teams!inner(*)') // Use an inner join to only get reviews with valid teams
+            .select('*')
             .eq('mentorId', currentUser.user.id);
 
           if (reviewsError) throw reviewsError;
           
-          if (reviewsWithTeams) {
-            // Extract unique teams from the joined response
-            const teamsData = [...new Map(reviewsWithTeams.map(r => r.team).map(t => [t.id, t])).values()];
-            setTeams(teamsData);
+          if (mentorReviews && mentorReviews.length > 0) {
+            const reviewsData = mentorReviews as any as Review[];
+            setReviews(reviewsData);
+            
+            // Now fetch only the teams associated with these reviews
+            const teamIds = [...new Set(reviewsData.map(r => r.teamId))];
+            if (teamIds.length > 0) {
+                const { data: associatedTeams, error: teamsError } = await supabaseClient
+                .from('teams')
+                .select('*')
+                .in('id', teamIds);
+                
+                if (teamsError) throw teamsError;
 
-            // Remove the joined 'team' property to match the Review type
-            const reviewsData = reviewsWithTeams.map(({ team, ...review }) => review);
-            setReviews(reviewsData as any as Review[]);
+                setTeams(associatedTeams || []);
+            } else {
+                setTeams([]);
+            }
           } else {
             setReviews([]);
             setTeams([]);

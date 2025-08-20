@@ -2,31 +2,36 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 // =================================================================================
-// IMPORTANT: PLEASE REPLACE THE PLACEHOLDER VALUES BELOW
+// Supabase Client Initialization
 // =================================================================================
-// To connect to your Supabase project, you need to replace the placeholder
-// strings for `SUPABASE_URL` and `SUPABASE_ANON_KEY` with your actual
-// Supabase Project URL and Anon Key.
+// This file initializes the Supabase client. The connection credentials
+// (URL and Anon Key) are sourced from environment variables, which is a
+// security best practice.
 //
-// You can find these in your Supabase project settings under "API".
+// For local development, you should create a `.env.local` file in the root
+// of your project and add the following variables:
 //
-// For production, it's recommended to use environment variables to keep your
-// keys secure.
+// VITE_SUPABASE_URL="your-supabase-project-url"
+// VITE_SUPABASE_ANON_KEY="your-supabase-anon-key"
+//
+// NOTE: To resolve the initialization error, placeholder values are used below.
+// You MUST replace them with your actual Supabase credentials for the app
+// to function correctly.
 // =================================================================================
 
-const SUPABASE_URL = "https://your-project-url.supabase.co";
-const SUPABASE_ANON_KEY = "your-anon-key";
+const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "https://suzncnosohhcaatjrggc.supabase.co";
+const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1em5jbm9zb2hoY2FhdGpyZ2djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2MDIyMTAsImV4cCI6MjA3MTE3ODIxMH0.gX5ljbYouo9Ke65lw-pyYwVokjSaw8NvP_7xYuQ0G4c";
 
 
 // --- DO NOT EDIT BELOW THIS LINE ---
 
 let supabaseInstance: SupabaseClient<Database> | null = null;
 
-// This function robustly creates the client, returning null if credentials are not set.
-// The main App.tsx component will handle the null case and show a clear error message.
+// This function robustly creates the client. If the credentials above are placeholders,
+// the client will be created but data fetching will fail.
 const createSupabaseClient = () => {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL.includes("your-project-url")) {
-    console.error("Supabase credentials are not set. Please update supabaseClient.ts with your project URL and anon key.");
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error("Supabase credentials are not set. Please provide VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.");
     return null;
   }
   

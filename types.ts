@@ -1,16 +1,12 @@
 import { AuthSession, User } from '@supabase/supabase-js';
 
-// Define Json type locally. In recent versions of `supabase-js`, this type is
-// not exported directly. The recursive definition can cause a "Type instantiation
-// is excessively deep" error with complex schemas. Using a non-recursive
-// definition with `any` is a common workaround for this compiler limitation.
 export type Json =
   | string
   | number
   | boolean
   | null
-  | { [key: string]: any }
-  | any[];
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 // Represents the score for one criterion
 export interface CriterionScore {
