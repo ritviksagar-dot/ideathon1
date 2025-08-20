@@ -3,6 +3,8 @@ import React from 'react';
 import type { Mentor, Review, Team } from '../types';
 import { CheckIcon } from './icons/CheckIcon';
 import { PencilIcon } from './icons/PencilIcon';
+import { DocumentTextIcon } from './icons/DocumentTextIcon';
+import { SCORING_RUBRIC_URL } from '../constants';
 
 interface MentorDashboardProps {
   mentor: Mentor;
@@ -30,7 +32,18 @@ const MentorDashboard: React.FC<MentorDashboardProps> = ({ mentor, reviews, team
 
   return (
     <div>
-      <h2 className="text-3xl font-bold mb-6 text-slate-800">Your Assigned Proposals</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-3xl font-bold text-slate-800">Your Assigned Proposals</h2>
+        <a
+          href={SCORING_RUBRIC_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center"
+        >
+          <DocumentTextIcon className="h-5 w-5 mr-2" />
+          View Scoring Rubric
+        </a>
+      </div>
       <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
         <ul className="divide-y divide-slate-200">
           {reviews.map(review => {
@@ -49,7 +62,7 @@ const MentorDashboard: React.FC<MentorDashboardProps> = ({ mentor, reviews, team
                       )}
                     </div>
                     <div>
-                      <p className="text-lg font-semibold text-slate-900">{team.name}</p>
+                      <p className="text-lg font-semibold text-slate-900">{team.id}</p>
                       <p className={`text-sm font-medium ${review.isCompleted ? 'text-green-700' : 'text-slate-500'}`}>
                         Status: {review.isCompleted ? 'Completed' : 'Pending Review'}
                       </p>

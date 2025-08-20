@@ -1,6 +1,9 @@
+
 import React, { useMemo, useState } from 'react';
 import type { Team, Review, Criterion, CriterionScore } from '../types';
 import Modal from './Modal';
+import { DocumentTextIcon } from './icons/DocumentTextIcon';
+import { SCORING_RUBRIC_URL } from '../constants';
 
 interface ReviewFormProps {
   team: Team;
@@ -50,16 +53,30 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
 
       <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200">
         <div className="flex justify-between items-start mb-2">
-            <h2 className="text-3xl font-bold text-slate-900">Reviewing: {team.name}</h2>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-blue-100 text-blue-800 hover:bg-blue-200 font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center text-sm"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2-2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
-                View Proposal
-            </button>
+            <div>
+                <h2 className="text-3xl font-bold text-slate-900">Reviewing Proposal {team.id}</h2>
+                <p className="text-slate-500 mt-1">Grade each criterion on a scale of 1 to 5.</p>
+            </div>
+            <div className="flex items-center space-x-2 flex-shrink-0">
+                <a
+                    href={SCORING_RUBRIC_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-slate-200 text-slate-800 hover:bg-slate-300 font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center text-sm"
+                >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" />
+                    Scoring Rubric
+                </a>
+                <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="bg-blue-100 text-blue-800 hover:bg-blue-200 font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center text-sm"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2-2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
+                    View Proposal
+                </button>
+            </div>
         </div>
-        <p className="text-slate-500 mb-8">Grade each criterion on a scale of 1 to 5.</p>
+        <div className="mb-8 mt-4 border-t border-slate-200"></div>
         
         <div className="space-y-6">
           {criteria.map(c => {
@@ -110,7 +127,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        title={`Proposal: ${team.name}`}>
+        title={`Proposal: ${team.id}`}>
         <div className="text-slate-600 whitespace-pre-wrap">
             {team.proposalDetails}
         </div>

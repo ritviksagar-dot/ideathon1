@@ -1,13 +1,5 @@
 import { AuthSession, User } from '@supabase/supabase-js';
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
-
 // Represents the score for one criterion
 export interface CriterionScore {
   criterionId: string;
@@ -56,21 +48,21 @@ export interface Database {
           id: number;
           teamId: string;
           mentorId: string;
-          scores: Json;
+          scores: CriterionScore[];
           isCompleted: boolean;
         };
         Insert: {
           id?: number;
           teamId: string;
           mentorId: string;
-          scores: Json;
+          scores: CriterionScore[];
           isCompleted: boolean;
         };
         Update: {
           id?: number;
           teamId?: string;
           mentorId?: string;
-          scores?: Json;
+          scores?: CriterionScore[];
           isCompleted?: boolean;
         };
       };

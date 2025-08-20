@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAppData } from './hooks/useAppData';
 import type { CurrentUser } from './types';
@@ -162,7 +163,8 @@ const App: React.FC = () => {
     try {
       const { error } = await supabaseClient.auth.signOut();
       if (error) throw error;
-      // The onAuthStateChange listener will handle setting currentUser to null
+      // Directly update state for a responsive UI instead of waiting for the listener.
+      setCurrentUser(null);
       setSelectedTeamId(null);
       setView('dashboard');
     } catch (error) {

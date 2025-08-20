@@ -40,7 +40,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
           setTeams(teamsResult.data || []);
 
           if (reviewsResult.error) throw reviewsResult.error;
-          setReviews((reviewsResult.data as any as Review[]) || []);
+          setReviews(reviewsResult.data || []);
 
           if (mentorsResult.error) throw mentorsResult.error;
           setMentors(mentorsResult.data || []);
@@ -55,11 +55,10 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
           if (reviewsError) throw reviewsError;
           
           if (mentorReviews && mentorReviews.length > 0) {
-            const reviewsData = mentorReviews as any as Review[];
-            setReviews(reviewsData);
+            setReviews(mentorReviews);
             
             // Now fetch only the teams associated with these reviews
-            const teamIds = [...new Set(reviewsData.map(r => r.teamId))];
+            const teamIds = [...new Set(mentorReviews.map(r => r.teamId))];
             if (teamIds.length > 0) {
                 const { data: associatedTeams, error: teamsError } = await supabaseClient
                 .from('teams')
@@ -116,7 +115,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
       return;
     }
 
-    const newReview: Omit<Review, 'id'> = {
+    const newReview = {
       teamId,
       mentorId,
       scores: CRITERIA.map(c => ({ criterionId: c.id, score: null })),
@@ -133,7 +132,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
       setError(error.message);
       showToast({ message: `Failed to create assignment: ${error.message}`, type: 'error' });
     } else if (insertedReview) {
-      setReviews(prev => [...prev, insertedReview as any as Review]);
+      setReviews(prev => [...prev, insertedReview]);
       showToast({ message: 'Assignment created successfully.', type: 'success' });
     }
   }, [reviews, showToast]);
@@ -192,7 +191,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
     } else {
         // Only update the local state after a successful save.
         setReviews(prevReviews => 
-            prevReviews.map(r => r.id === reviewId ? { ...r, scores: updatedReview.scores as CriterionScore[] } : r)
+            prevReviews.map(r => r.id === reviewId ? updatedReview : r)
         );
         showToast({ message: 'Changes saved!', type: 'success' });
     }
@@ -226,7 +225,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
     } else {
         // Only update the local state after a successful save.
         setReviews(prevReviews => 
-            prevReviews.map(r => r.id === reviewId ? { ...r, isCompleted: updatedReview.isCompleted } : r)
+            prevReviews.map(r => r.id === reviewId ? updatedReview : r)
         );
         showToast({ message: 'Changes saved!', type: 'success' });
     }
