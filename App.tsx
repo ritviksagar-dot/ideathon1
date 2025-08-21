@@ -76,32 +76,44 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // onAuthStateChange is the single source of truth for the user's session.
-    // It fires immediately upon subscription with the current session, handling the initial check.
+    // This effect should only run once to set up the auth subscription.
+    // The authLoading state is managed internally and should not be a dependency.
+    const authTimeout = setTimeout(() => {
+      // The check on initialAuthCheckCompleted prevents this from firing
+      // if the auth state has already been successfully determined.
+      if (!initialAuthCheckCompleted.current) {
+        setAuthLoading(false);
+        showToast({
+          message: "Authentication timed out. Please check your network and refresh.",
+          type: 'error',
+        });
+      }
+    }, 10000); // 10-second timeout
+
     const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      clearTimeout(authTimeout);
       try {
         if (session?.user) {
           const profile = await getOrCreateMentorProfile(session.user);
-          if (profile) {
-            setCurrentUser({ session, user: session.user, profile });
-          } else {
-            // If profile creation fails, the user can't use the app. Sign them out.
-            await supabaseClient.auth.signOut();
-            setCurrentUser(null);
+          // Always set the user; the profile can be null if fetching/creation failed.
+          setCurrentUser({ session, user: session.user, profile });
+          
+          if (!profile) {
+            // This toast informs the user of the problem without logging them out.
+            showToast({ message: "Could not load mentor profile. You may not have permission to view your data.", type: 'error' });
           }
         } else {
-          // This handles SIGNED_OUT events and the initial state if there's no session.
-          // It's crucial to reset all user-related state here.
+          // Handles SIGNED_OUT events and initial state if no session.
           setCurrentUser(null);
           setSelectedTeamId(null);
           setView('dashboard');
+          setIsLoggingOut(false);
         }
       } catch (error) {
         console.error("Error during auth state change:", error);
         showToast({ message: `Authentication error: ${error instanceof Error ? error.message : String(error)}`, type: 'error' });
         setCurrentUser(null);
       } finally {
-        // This ensures the "Authenticating..." screen is only shown once on initial load.
         if (!initialAuthCheckCompleted.current) {
           setAuthLoading(false);
           initialAuthCheckCompleted.current = true;
@@ -111,6 +123,7 @@ const App: React.FC = () => {
 
     return () => {
       subscription.unsubscribe();
+      clearTimeout(authTimeout);
     };
   }, [getOrCreateMentorProfile, showToast]);
 
@@ -151,20 +164,38 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    const { error } = await supabaseClient.auth.signOut();
-    
-    if (error) {
-       console.error('Error logging out:', error);
-       showToast({
-         message: `Logout failed: ${error instanceof Error ? error.message : 'Please check your connection.'}`,
-         type: 'error'
-       });
-       // Only reset loading state on error, otherwise let the auth listener handle the UI transition.
-       setIsLoggingOut(false);
+    if (!supabaseClient) {
+        setIsLoggingOut(false);
+        return;
     }
-    // On success, the onAuthStateChange listener is the single source of truth.
-    // It will set the user to null, which will cause this component to unmount
-    // and the LoginScreen to appear. The isLoggingOut state is irrelevant after this.
+
+    // Race signOut against a timeout to prevent getting stuck
+    const logoutPromise = supabaseClient.auth.signOut();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Logout timed out')), 5000) // 5-second timeout
+    );
+
+    try {
+      const { error } = await Promise.race([logoutPromise, timeoutPromise]) as { error: Error | null };
+      if (error) {
+        throw error; // Throw to be caught by the catch block
+      }
+      // On success, onAuthStateChange will handle the state change to logged-out.
+      // The listener will also set isLoggingOut to false.
+    } catch (error) {
+      console.error('Error logging out:', error);
+      showToast({
+        message: `Logout failed or timed out. Redirecting to login screen.`,
+        type: 'error'
+      });
+      
+      // IMPORTANT: Even on failure/timeout, we must transition the user to a logged-out state
+      // on the client to prevent them from being stuck.
+      setCurrentUser(null);
+      setSelectedTeamId(null);
+      setView('dashboard');
+      setIsLoggingOut(false);
+    }
   };
 
   const handleSelectTeam = (teamId: string) => {
@@ -247,7 +278,21 @@ const App: React.FC = () => {
                 />
             );
         }
-        return <div>Your profile is being created. Please refresh in a moment.</div>;
+        return (
+            <div className="text-center bg-white p-12 rounded-xl shadow-md border border-red-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h3 className="mt-4 text-xl font-semibold text-slate-800">Profile Error</h3>
+                <p className="mt-2 text-slate-500 max-w-lg mx-auto">
+                    We couldn't load your mentor profile. This is likely due to a permissions issue. 
+                    Please ensure that your Supabase Row Level Security (RLS) policies allow authenticated users to read and create their own profile in the <code className="bg-slate-200 text-sm p-1 rounded">mentors</code> table.
+                </p>
+                <p className="mt-4 text-sm text-slate-400">
+                    If you are not the administrator, please contact them for assistance.
+                </p>
+            </div>
+        );
     }
   };
 

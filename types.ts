@@ -25,6 +25,7 @@ export interface Database {
           name?: string;
           proposalDetails?: string;
         };
+        Relationships: [];
       };
       mentors: {
         Row: {
@@ -42,6 +43,7 @@ export interface Database {
           name?: string;
           isInternal?: boolean;
         };
+        Relationships: [];
       };
       reviews: {
         Row: {
@@ -65,6 +67,7 @@ export interface Database {
           scores?: CriterionScore[];
           isCompleted?: boolean;
         };
+        Relationships: [];
       };
     };
     Views: {};
