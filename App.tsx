@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppData } from './hooks/useAppData';
 import type { CurrentUser } from './types';
 import LoginScreen from './components/LoginScreen';
@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [view, setView] = useState<View>('dashboard');
   const [toast, setToast] = useState<ToastData | null>(null);
+  const initialAuthCheckCompleted = useRef(false);
 
   const showToast = useCallback((data: ToastData) => {
     setToast(data);
@@ -75,52 +76,42 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setAuthLoading(true);
-
-    const checkInitialSession = async () => {
+    // onAuthStateChange is the single source of truth for the user's session.
+    // It fires immediately upon subscription with the current session, handling the initial check.
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
       try {
-        // The aggressive custom timeout was removed to rely on the Supabase client's
-        // own network handling. This prevents premature timeouts on slow connections
-        // and provides more specific error messages from the library itself.
-        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
-
-        if (sessionError) {
-          throw sessionError;
-        }
-        
         if (session?.user) {
           const profile = await getOrCreateMentorProfile(session.user);
           if (profile) {
             setCurrentUser({ session, user: session.user, profile });
           } else {
+            // If profile creation fails, the user can't use the app. Sign them out.
             await supabaseClient.auth.signOut();
             setCurrentUser(null);
           }
         } else {
+          // This handles SIGNED_OUT events and the initial state if there's no session.
+          // It's crucial to reset all user-related state here.
           setCurrentUser(null);
+          setSelectedTeamId(null);
+          setView('dashboard');
         }
       } catch (error) {
-        console.error("Error checking initial session:", error);
-        showToast({ message: `Authentication failed: ${error instanceof Error ? error.message : String(error)}`, type: 'error' });
+        console.error("Error during auth state change:", error);
+        showToast({ message: `Authentication error: ${error instanceof Error ? error.message : String(error)}`, type: 'error' });
         setCurrentUser(null);
       } finally {
-        setAuthLoading(false);
-      }
-    };
-
-    checkInitialSession();
-
-    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-        const user = session?.user ?? null;
-        if (user) {
-            const profile = await getOrCreateMentorProfile(user);
-            setCurrentUser(profile ? { session: session!, user, profile } : null);
-        } else {
-            setCurrentUser(null);
+        // This ensures the "Authenticating..." screen is only shown once on initial load.
+        if (!initialAuthCheckCompleted.current) {
+          setAuthLoading(false);
+          initialAuthCheckCompleted.current = true;
         }
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [getOrCreateMentorProfile, showToast]);
 
   // Proactively check session when the tab becomes visible again
@@ -160,22 +151,20 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    try {
-      const { error } = await supabaseClient.auth.signOut();
-      if (error) throw error;
-      // Directly update state for a responsive UI instead of waiting for the listener.
-      setCurrentUser(null);
-      setSelectedTeamId(null);
-      setView('dashboard');
-    } catch (error) {
+    const { error } = await supabaseClient.auth.signOut();
+    
+    if (error) {
        console.error('Error logging out:', error);
        showToast({
          message: `Logout failed: ${error instanceof Error ? error.message : 'Please check your connection.'}`,
          type: 'error'
        });
-    } finally {
-        setIsLoggingOut(false);
+       // Only reset loading state on error, otherwise let the auth listener handle the UI transition.
+       setIsLoggingOut(false);
     }
+    // On success, the onAuthStateChange listener is the single source of truth.
+    // It will set the user to null, which will cause this component to unmount
+    // and the LoginScreen to appear. The isLoggingOut state is irrelevant after this.
   };
 
   const handleSelectTeam = (teamId: string) => {
