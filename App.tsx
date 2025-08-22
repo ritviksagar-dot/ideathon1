@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppData } from './hooks/useAppData';
-import type { CurrentUser } from './types';
+import type { CurrentUser, Mentor, Review } from './types';
 import LoginScreen from './components/LoginScreen';
 import MentorDashboard from './components/MentorDashboard';
 import ReviewForm from './components/ReviewForm';
@@ -14,10 +14,21 @@ import DashboardSkeleton from './components/DashboardSkeleton';
 
 type View = 'dashboard' | 'review';
 
+const withTimeout = <T,>(promise: PromiseLike<T>, ms: number, errorMessage = 'Operation timed out'): Promise<T> => {
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(errorMessage));
+    }, ms);
+  });
+  return Promise.race([promise, timeoutPromise]);
+};
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [longLoadMessage, setLongLoadMessage] = useState<string | null>(null);
   
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [view, setView] = useState<View>('dashboard');
@@ -39,48 +50,78 @@ const App: React.FC = () => {
     );
   }
 
-  const getOrCreateMentorProfile = useCallback(async (user: User) => {
-    if (!supabaseClient) return null;
-    const { data: existingProfile, error: selectError } = await supabaseClient
-      .from('mentors')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+  const getOrCreateMentorProfile = useCallback(async (user: User): Promise<{ profile: Mentor | null, error: string | null }> => {
+    if (!supabaseClient) return { profile: null, error: "Supabase client not initialized." };
+  
+    try {
+      // 1. Try to fetch existing profile with timeout
+      const selectQuery = supabaseClient
+        .from('mentors')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-    if (selectError && selectError.code !== 'PGRST116') {
-      console.error("Error fetching mentor profile:", selectError);
-      return null;
-    }
-    if (existingProfile) return existingProfile;
+      const { data: existingProfile, error: selectError } = await withTimeout(selectQuery, 8000, 'Fetching profile timed out.');
 
-    let profileName = user.email || 'New Mentor';
-    if (user.user_metadata?.role !== 'admin' && profileName.endsWith('@review.app')) {
-      profileName = profileName.replace('@review.app', '');
-    }
+      if (selectError && selectError.code !== 'PGRST116') { // PGRST116: No rows found
+        const message = `Failed to fetch your profile. This is often caused by a Row Level Security (RLS) policy in Supabase. Please ensure authenticated users have SELECT permission on the 'mentors' table for their own record.\n\nDetails: ${selectError.message}`;
+        console.error("Error fetching mentor profile:", selectError);
+        return { profile: null, error: message };
+      }
+  
+      if (existingProfile) {
+        return { profile: existingProfile, error: null };
+      }
+  
+      // 2. If no profile, try to create one with timeout
+      let profileName = user.email || 'New Mentor';
+      if (user.user_metadata?.role !== 'admin' && profileName.endsWith('@review.app')) {
+        profileName = profileName.replace('@review.app', '');
+      }
+  
+      const insertQuery = supabaseClient
+        .from('mentors')
+        .insert({
+          id: user.id,
+          name: profileName,
+          isInternal: user.user_metadata?.role === 'admin'
+        })
+        .select()
+        .single();
+      
+      const { data: newProfile, error: insertError } = await withTimeout(insertQuery, 8000, 'Creating profile timed out.');
+      
+      if (insertError) {
+        const message = `Failed to create your profile after login. This is often caused by a Row Level Security (RLS) policy. Please ensure authenticated users have INSERT permission on the 'mentors' table.\n\nDetails: ${insertError.message}`;
+        console.error("Error creating mentor profile:", insertError);
+        return { profile: null, error: message };
+      }
+  
+      return { profile: newProfile, error: null };
 
-    const { data: newProfile, error: insertError } = await supabaseClient
-      .from('mentors')
-      .insert({
-        id: user.id,
-        name: profileName,
-        isInternal: user.user_metadata?.role === 'admin'
-      })
-      .select()
-      .single();
-    
-    if (insertError) {
-      console.error("Error creating mentor profile:", insertError);
-      return null;
+    } catch (e: any) {
+      const message = `A network error occurred while accessing your profile. Please check your internet connection and refresh the page.\n\nDetails: ${e.message}`;
+      console.error("Error in getOrCreateMentorProfile:", e);
+      return { profile: null, error: message };
     }
-    return newProfile;
   }, []);
 
   useEffect(() => {
-    // This effect should only run once to set up the auth subscription.
-    // The authLoading state is managed internally and should not be a dependency.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (authLoading) {
+      // After 4 seconds, show a more informative message.
+      timer = setTimeout(() => {
+        setLongLoadMessage("Waking up the database... This can take up to 30 seconds if the app has been inactive.");
+      }, 4000);
+    } else {
+      // If loading finishes, clear the message.
+      setLongLoadMessage(null);
+    }
+    return () => clearTimeout(timer);
+  }, [authLoading]);
+
+  useEffect(() => {
     const authTimeout = setTimeout(() => {
-      // The check on initialAuthCheckCompleted prevents this from firing
-      // if the auth state has already been successfully determined.
       if (!initialAuthCheckCompleted.current) {
         setAuthLoading(false);
         showToast({
@@ -88,22 +129,20 @@ const App: React.FC = () => {
           type: 'error',
         });
       }
-    }, 10000); // 10-second timeout
+    }, 10000);
 
     const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
       clearTimeout(authTimeout);
+      setProfileError(null);
       try {
         if (session?.user) {
-          const profile = await getOrCreateMentorProfile(session.user);
-          // Always set the user; the profile can be null if fetching/creation failed.
+          const { profile, error } = await getOrCreateMentorProfile(session.user);
           setCurrentUser({ session, user: session.user, profile });
           
-          if (!profile) {
-            // This toast informs the user of the problem without logging them out.
-            showToast({ message: "Could not load mentor profile. You may not have permission to view your data.", type: 'error' });
+          if (error) {
+            setProfileError(error);
           }
         } else {
-          // Handles SIGNED_OUT events and initial state if no session.
           setCurrentUser(null);
           setSelectedTeamId(null);
           setView('dashboard');
@@ -111,7 +150,8 @@ const App: React.FC = () => {
         }
       } catch (error) {
         console.error("Error during auth state change:", error);
-        showToast({ message: `Authentication error: ${error instanceof Error ? error.message : String(error)}`, type: 'error' });
+        const errorMessage = `An unexpected authentication error occurred: ${error instanceof Error ? error.message : String(error)}`;
+        setProfileError(errorMessage);
         setCurrentUser(null);
       } finally {
         if (!initialAuthCheckCompleted.current) {
@@ -127,12 +167,9 @@ const App: React.FC = () => {
     };
   }, [getOrCreateMentorProfile, showToast]);
 
-  // Proactively check session when the tab becomes visible again
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && supabaseClient) {
-        // This helps refresh the token or detect an expired session
-        // after the computer has been asleep or the tab was in the background.
         supabaseClient.auth.getSession();
       }
     };
@@ -150,11 +187,11 @@ const App: React.FC = () => {
     reviews,
     teams,
     mentors,
-    updateScore,
-    toggleCompleteStatus,
+    saveReviewUpdate,
     getReviewsForMentor,
-    getLeaderboardData,
-    getMentorProgressData,
+    leaderboardData,
+    mentorProgressData,
+    adminCommentsData,
     isLoading: isDataLoading,
     error,
     addTeam,
@@ -169,19 +206,16 @@ const App: React.FC = () => {
         return;
     }
 
-    // Race signOut against a timeout to prevent getting stuck
     const logoutPromise = supabaseClient.auth.signOut();
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Logout timed out')), 5000) // 5-second timeout
+      setTimeout(() => reject(new Error('Logout timed out')), 5000)
     );
 
     try {
       const { error } = await Promise.race([logoutPromise, timeoutPromise]) as { error: Error | null };
       if (error) {
-        throw error; // Throw to be caught by the catch block
+        throw error;
       }
-      // On success, onAuthStateChange will handle the state change to logged-out.
-      // The listener will also set isLoggingOut to false.
     } catch (error) {
       console.error('Error logging out:', error);
       showToast({
@@ -189,8 +223,6 @@ const App: React.FC = () => {
         type: 'error'
       });
       
-      // IMPORTANT: Even on failure/timeout, we must transition the user to a logged-out state
-      // on the client to prevent them from being stuck.
       setCurrentUser(null);
       setSelectedTeamId(null);
       setView('dashboard');
@@ -210,8 +242,13 @@ const App: React.FC = () => {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-2xl font-semibold text-slate-700 animate-pulse">Authenticating...</div>
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <div className="text-center">
+            <div className="text-2xl font-semibold text-slate-700 animate-pulse">Authenticating...</div>
+            {longLoadMessage && (
+                <p className="mt-4 text-slate-500 max-w-sm">{longLoadMessage}</p>
+            )}
+        </div>
       </div>
     );
   }
@@ -228,6 +265,25 @@ const App: React.FC = () => {
     if (isDataLoading) {
         return <DashboardSkeleton isAdmin={isAdmin} />;
     }
+
+    if (profileError) {
+        return (
+            <div className="text-center bg-white p-12 rounded-xl shadow-md border border-red-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h3 className="mt-4 text-xl font-semibold text-slate-800">Authentication Error</h3>
+                <p className="mt-3 text-slate-700 max-w-3xl mx-auto text-left whitespace-pre-wrap font-mono bg-red-50 p-4 rounded-md border border-red-200">
+                  {profileError}
+                </p>
+                <p className="mt-4 text-sm text-slate-500">
+                    You are successfully logged in, but the application cannot continue until this is resolved. 
+                    If you are not the administrator, please forward this message to them.
+                </p>
+            </div>
+        );
+    }
+
     if(error) {
         return <div className="text-center text-red-500 bg-red-100 p-4 rounded-md">{error}</div>;
     }
@@ -235,8 +291,9 @@ const App: React.FC = () => {
     if (isAdmin) {
       return (
         <AdminDashboard
-          leaderboardData={getLeaderboardData()}
-          mentorProgressData={getMentorProgressData()}
+          leaderboardData={leaderboardData}
+          mentorProgressData={mentorProgressData}
+          adminCommentsData={adminCommentsData}
           teams={teams}
           mentors={mentors}
           reviews={reviews}
@@ -257,12 +314,10 @@ const App: React.FC = () => {
               review={selectedReview}
               criteria={CRITERIA}
               onBack={handleBackToDashboard}
-              onUpdateScore={(criterionId, score) => updateScore(selectedReview.id, criterionId, score)}
-              onToggleComplete={() => toggleCompleteStatus(selectedReview.id)}
+              onSaveReview={(scores, isCompleted, comment) => saveReviewUpdate(selectedReview.id, scores, isCompleted, comment)}
             />
           );
         }
-        // Fallback to dashboard if something is wrong
         handleBackToDashboard();
         return null;
       
@@ -278,21 +333,9 @@ const App: React.FC = () => {
                 />
             );
         }
-        return (
-            <div className="text-center bg-white p-12 rounded-xl shadow-md border border-red-200">
-                <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <h3 className="mt-4 text-xl font-semibold text-slate-800">Profile Error</h3>
-                <p className="mt-2 text-slate-500 max-w-lg mx-auto">
-                    We couldn't load your mentor profile. This is likely due to a permissions issue. 
-                    Please ensure that your Supabase Row Level Security (RLS) policies allow authenticated users to read and create their own profile in the <code className="bg-slate-200 text-sm p-1 rounded">mentors</code> table.
-                </p>
-                <p className="mt-4 text-sm text-slate-400">
-                    If you are not the administrator, please contact them for assistance.
-                </p>
-            </div>
-        );
+        // If profile is null but no error, it means it's still being processed
+        // or there was another issue. A skeleton is a safe fallback.
+        return <DashboardSkeleton isAdmin={false} />;
     }
   };
 

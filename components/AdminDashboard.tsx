@@ -1,10 +1,12 @@
+
 import React, { useState } from 'react';
-import type { LeaderboardEntry, MentorProgress, Team, Mentor, Review } from '../types';
+import type { LeaderboardEntry, MentorProgress, Team, Mentor, Review, AdminCommentData } from '../types';
 import Modal from './Modal';
 
 interface AdminDashboardProps {
   leaderboardData: LeaderboardEntry[];
   mentorProgressData: MentorProgress[];
+  adminCommentsData: AdminCommentData[];
   teams: Team[];
   mentors: Mentor[];
   reviews: Review[];
@@ -13,9 +15,9 @@ interface AdminDashboardProps {
   onUnassignMentor: (reviewId: number) => void;
 }
 
-type Tab = 'leaderboard' | 'mentors' | 'data';
+type Tab = 'leaderboard' | 'mentors' | 'comments' | 'data';
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentorProgressData, teams, mentors, reviews, onAddTeam, onAssignMentor, onUnassignMentor }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentorProgressData, adminCommentsData, teams, mentors, reviews, onAddTeam, onAssignMentor, onUnassignMentor }) => {
   const [activeTab, setActiveTab] = useState<Tab>('leaderboard');
 
   const renderLeaderboard = () => (
@@ -106,6 +108,56 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentor
       </table>
     </div>
   );
+  
+    const renderReviewerComments = () => {
+    // Find the maximum number of comments for any team to create the table headers
+    const maxComments = Math.max(0, ...adminCommentsData.map(d => d.comments.length));
+
+    return (
+        <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-x-auto">
+            <table className="w-full text-left min-w-[800px]">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th className="px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Rank</th>
+                        <th className="px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Team Name</th>
+                        {/* Dynamically create a header for each potential reviewer */}
+                        {Array.from({ length: maxComments }).map((_, i) => (
+                            <th key={i} className="px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">{`Reviewer ${i + 1} Comments`}</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                    {adminCommentsData.map(entry => (
+                        <tr key={entry.team.id} className="hover:bg-slate-50 transition">
+                            <td className="px-6 py-4 whitespace-nowrap align-top">
+                                <span className="font-bold text-lg text-slate-700">{entry.rank}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap align-top">
+                                <span className="font-semibold text-slate-800">{entry.team.name}</span>
+                            </td>
+                            {/* Fill in comments for each reviewer, or leave blank */}
+                            {Array.from({ length: maxComments }).map((_, i) => {
+                                const commentData = entry.comments[i];
+                                return (
+                                    <td key={i} className="px-6 py-4 align-top text-sm text-slate-600">
+                                        {commentData ? (
+                                            <div>
+                                                <p className="font-semibold text-slate-800">{commentData.mentorName}</p>
+                                                <p className="mt-1 whitespace-pre-wrap">{commentData.comment || <span className="italic text-slate-400">No comment provided.</span>}</p>
+                                            </div>
+                                        ) : (
+                                            <span className="italic text-slate-400">--</span>
+                                        )}
+                                    </td>
+                                );
+                            })}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+  };
   
   const ManageData = () => {
     const [teamId, setTeamId] = useState('');
@@ -288,11 +340,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentor
         <div className="flex space-x-2 p-1 bg-slate-200 rounded-lg">
           <button onClick={() => setActiveTab('leaderboard')} className={`px-4 py-2 text-sm font-semibold rounded-md transition ${activeTab === 'leaderboard' ? 'bg-white shadow text-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>Team Leaderboard</button>
           <button onClick={() => setActiveTab('mentors')} className={`px-4 py-2 text-sm font-semibold rounded-md transition ${activeTab === 'mentors' ? 'bg-white shadow text-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>Mentor Progress</button>
+          <button onClick={() => setActiveTab('comments')} className={`px-4 py-2 text-sm font-semibold rounded-md transition ${activeTab === 'comments' ? 'bg-white shadow text-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>Reviewer Comments</button>
           <button onClick={() => setActiveTab('data')} className={`px-4 py-2 text-sm font-semibold rounded-md transition ${activeTab === 'data' ? 'bg-white shadow text-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>Manage Data</button>
         </div>
       </div>
       {activeTab === 'leaderboard' && renderLeaderboard()}
       {activeTab === 'mentors' && renderMentorProgress()}
+      {activeTab === 'comments' && renderReviewerComments()}
       {activeTab === 'data' && <ManageData />}
     </div>
   );

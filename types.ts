@@ -1,12 +1,12 @@
 import { AuthSession, User } from '@supabase/supabase-js';
 
 // Represents the score for one criterion
-export interface CriterionScore {
+export type CriterionScore = {
   criterionId: string;
   score: number | null; // 1-5, null if not yet scored
 }
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       teams: {
@@ -50,22 +50,25 @@ export interface Database {
           id: number;
           teamId: string;
           mentorId: string;
-          scores: CriterionScore[];
+          scores: any;
           isCompleted: boolean;
+          comment: string | null;
         };
         Insert: {
           id?: number;
           teamId: string;
           mentorId: string;
-          scores: CriterionScore[];
+          scores: any;
           isCompleted: boolean;
+          comment?: string | null;
         };
         Update: {
           id?: number;
           teamId?: string;
           mentorId?: string;
-          scores?: CriterionScore[];
+          scores?: any;
           isCompleted?: boolean;
+          comment?: string | null;
         };
         Relationships: [];
       };
@@ -75,7 +78,7 @@ export interface Database {
     Enums: {};
     CompositeTypes: {};
   };
-}
+};
 
 export interface Criterion {
   id: string;
@@ -83,27 +86,12 @@ export interface Criterion {
   weight: number; // e.g., 0.2 for 20%
 }
 
-export interface Team {
-  id: string;
-  name: string;
-  proposalDetails: string;
-}
+// App-level types, derived from the database schema for consistency
+export type Team = Database['public']['Tables']['teams']['Row'];
+export type Mentor = Database['public']['Tables']['mentors']['Row'];
 
-// Represents the user profile stored in the public 'mentors' table
-export interface Mentor {
-  id: string; // This is the UUID from auth.users
-  name: string;
-  isInternal: boolean;
-}
-
-// A complete review by one mentor for one team
-export interface Review {
-  id: number; // Primary key from the database
-  teamId: string;
-  mentorId: string;
-  scores: CriterionScore[];
-  isCompleted: boolean;
-}
+// A complete review by one mentor for one team.
+export type Review = Database['public']['Tables']['reviews']['Row'];
 
 export interface LeaderboardEntry {
   rank: number;
@@ -118,6 +106,12 @@ export interface MentorProgress {
   mentor: Mentor;
   completedReviews: number;
   totalReviews: number;
+}
+
+export interface AdminCommentData {
+    rank: number;
+    team: Team;
+    comments: { mentorName: string; comment: string | null }[];
 }
 
 export interface CurrentUser {

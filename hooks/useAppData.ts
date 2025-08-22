@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { Review, Team, Mentor, CriterionScore, LeaderboardEntry, MentorProgress, CurrentUser } from '../types';
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { Review, Team, Mentor, CriterionScore, LeaderboardEntry, MentorProgress, CurrentUser, AdminCommentData } from '../types';
 import { CRITERIA } from '../constants';
 import { supabaseClient } from '../supabaseClient';
 import type { ToastData } from '../components/Toast';
@@ -40,7 +41,12 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
           setTeams(teamsResult.data || []);
 
           if (reviewsResult.error) throw reviewsResult.error;
-          setReviews(reviewsResult.data || []);
+          const parsedReviews = (reviewsResult.data || []).map(r => ({
+            ...r,
+            scores: Array.isArray(r.scores) ? r.scores : CRITERIA.map(c => ({ criterionId: c.id, score: null })),
+            comment: r.comment ?? null,
+          })) as Review[];
+          setReviews(parsedReviews);
 
           if (mentorsResult.error) throw mentorsResult.error;
           setMentors(mentorsResult.data || []);
@@ -55,10 +61,15 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
           if (reviewsError) throw reviewsError;
           
           if (mentorReviews && mentorReviews.length > 0) {
-            setReviews(mentorReviews);
+            const parsedMentorReviews = (mentorReviews || []).map(r => ({
+                ...r,
+                scores: Array.isArray(r.scores) ? r.scores : CRITERIA.map(c => ({ criterionId: c.id, score: null })),
+                comment: r.comment ?? null,
+            })) as Review[];
+            setReviews(parsedMentorReviews);
             
             // Now fetch only the teams associated with these reviews
-            const teamIds = [...new Set(mentorReviews.map(r => r.teamId))];
+            const teamIds = [...new Set(parsedMentorReviews.map(r => r.teamId))];
             if (teamIds.length > 0) {
                 const { data: associatedTeams, error: teamsError } = await supabaseClient
                 .from('teams')
@@ -90,7 +101,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
     loadData();
   }, [currentUser]);
 
-  const addTeam = useCallback(async (team: Omit<Team, 'proposalDetails'> & { proposalDetails: string }) => {
+  const addTeam = useCallback(async (team: Omit<Team, 'proposalDetails'> & { proposalDetails: string }): Promise<Team | null> => {
     if (!supabaseClient) return null;
     const { data, error } = await supabaseClient.from('teams').insert(team).select().single();
     if (error) {
@@ -120,6 +131,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
       mentorId,
       scores: CRITERIA.map(c => ({ criterionId: c.id, score: null })),
       isCompleted: false,
+      comment: null,
     };
 
     const { data: insertedReview, error } = await supabaseClient
@@ -132,7 +144,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
       setError(error.message);
       showToast({ message: `Failed to create assignment: ${error.message}`, type: 'error' });
     } else if (insertedReview) {
-      setReviews(prev => [...prev, insertedReview]);
+      setReviews(prev => [...prev, insertedReview as Review]);
       showToast({ message: 'Assignment created successfully.', type: 'success' });
     }
   }, [reviews, showToast]);
@@ -160,26 +172,16 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
     }
   }, [reviews, showToast]);
 
-  const updateScore = useCallback(async (reviewId: number, criterionId: string, score: number | null) => {
+  const saveReviewUpdate = useCallback(async (reviewId: number, newScores: CriterionScore[], newStatus: boolean, newComment: string): Promise<boolean> => {
     if (!currentUser || !supabaseClient) {
-        showToast({ message: "You must be logged in to update a score.", type: 'error'});
-        return;
+        showToast({ message: "You must be logged in to save changes.", type: 'error'});
+        return false;
     }
 
-    const targetReview = reviews.find(r => r.id === reviewId);
-    if (!targetReview) {
-        showToast({ message: "Internal error: Could not find the review to update.", type: 'error'});
-        return;
-    }
-
-    const updatedScores = targetReview.scores.map(s =>
-      s.criterionId === criterionId ? { ...s, score } : s
-    );
-
-    // Update the database first and wait for confirmation.
+    // Update the database first
     const { data: updatedReview, error } = await supabaseClient
         .from('reviews')
-        .update({ scores: updatedScores })
+        .update({ scores: newScores, isCompleted: newStatus, comment: newComment })
         .eq('id', reviewId)
         .eq('mentorId', currentUser.user.id)
         .select()
@@ -188,54 +190,22 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
     if (error || !updatedReview) {
         const errorMessage = error?.message || "Failed to save. This might be due to a permissions issue or if the review does not belong to you.";
         showToast({ message: `Error: ${errorMessage}`, type: 'error'});
+        return false;
     } else {
-        // Only update the local state after a successful save.
+        // Update local state on success
         setReviews(prevReviews => 
-            prevReviews.map(r => r.id === reviewId ? updatedReview : r)
+            prevReviews.map(r => r.id === reviewId ? (updatedReview as Review) : r)
         );
-        showToast({ message: 'Changes saved!', type: 'success' });
+        showToast({ message: 'Review saved!', type: 'success' });
+        return true;
     }
-  }, [reviews, showToast, currentUser]);
-
-  const toggleCompleteStatus = useCallback(async (reviewId: number) => {
-    if (!currentUser || !supabaseClient) {
-        showToast({ message: "You must be logged in to update a status.", type: 'error'});
-        return;
-    }
-    
-    const targetReview = reviews.find(r => r.id === reviewId);
-    if (!targetReview) {
-        showToast({ message: "Internal error: Could not find the review to update.", type: 'error'});
-        return;
-    }
-    const newStatus = !targetReview.isCompleted;
-
-    // Update the database first and wait for confirmation.
-    const { data: updatedReview, error } = await supabaseClient
-        .from('reviews')
-        .update({ isCompleted: newStatus })
-        .eq('id', reviewId)
-        .eq('mentorId', currentUser.user.id)
-        .select()
-        .single();
-        
-    if (error || !updatedReview) {
-        const errorMessage = error?.message || "Failed to save. This might be due to a permissions issue or if the review does not belong to you.";
-        showToast({ message: `Error: ${errorMessage}`, type: 'error'});
-    } else {
-        // Only update the local state after a successful save.
-        setReviews(prevReviews => 
-            prevReviews.map(r => r.id === reviewId ? updatedReview : r)
-        );
-        showToast({ message: 'Changes saved!', type: 'success' });
-    }
-  }, [reviews, showToast, currentUser]);
+  }, [showToast, currentUser]);
   
   const getReviewsForMentor = useCallback((mentorId: string) => {
       return reviews.filter(review => review.mentorId === mentorId);
   }, [reviews]);
   
-  const calculateWeightedScore = (scores: CriterionScore[]): number => {
+  const calculateWeightedScore = useCallback((scores: CriterionScore[]): number => {
     const totalScore = scores.reduce((acc, currentScore) => {
         const criterion = CRITERIA.find(c => c.id === currentScore.criterionId);
         if (criterion && currentScore.score !== null) {
@@ -244,9 +214,9 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
         return acc;
     }, 0);
     return parseFloat(totalScore.toFixed(2));
-  };
+  }, []);
 
-  const getLeaderboardData = useCallback((): LeaderboardEntry[] => {
+  const leaderboardData = useMemo((): LeaderboardEntry[] => {
     const teamScores: { [key: string]: { scores: number[], reviewers: {name: string, score: number}[], totalReviews: number } } = {};
 
     reviews.forEach(review => {
@@ -257,7 +227,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
       
       const mentor = mentors.find(m => m.id === review.mentorId);
       if (review.isCompleted) {
-        const weightedScore = calculateWeightedScore(review.scores);
+        const weightedScore = calculateWeightedScore(review.scores as CriterionScore[]);
         teamScores[review.teamId].scores.push(weightedScore);
         if(mentor) {
              teamScores[review.teamId].reviewers.push({ name: mentor.name, score: weightedScore });
@@ -283,9 +253,9 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
     leaderboard.sort((a, b) => b.averageScore - a.averageScore);
 
     return leaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
-  }, [reviews, teams, mentors]);
+  }, [reviews, teams, mentors, calculateWeightedScore]);
   
-  const getMentorProgressData = useCallback((): MentorProgress[] => {
+  const mentorProgressData = useMemo((): MentorProgress[] => {
     return mentors.map(mentor => {
       const assignedReviews = reviews.filter(r => r.mentorId === mentor.id);
       const completedReviews = assignedReviews.filter(r => r.isCompleted).length;
@@ -298,17 +268,37 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
     });
   }, [reviews, mentors]);
 
+  const adminCommentsData = useMemo((): AdminCommentData[] => {
+    // This is based on leaderboardData to get the rank and team info easily
+    return leaderboardData.map(entry => {
+        const teamReviews = reviews.filter(r => r.teamId === entry.team.id);
+        const comments = teamReviews.map(review => {
+            const mentor = mentors.find(m => m.id === review.mentorId);
+            return {
+                mentorName: mentor?.name || 'Unknown Mentor',
+                comment: review.comment || null
+            };
+        }).sort((a, b) => a.mentorName.localeCompare(b.mentorName));
+
+        return {
+            rank: entry.rank,
+            team: entry.team,
+            comments: comments
+        };
+    });
+  }, [leaderboardData, reviews, mentors]);
+
   return {
     reviews,
     teams,
     mentors,
     isLoading,
     error,
-    updateScore,
-    toggleCompleteStatus,
+    saveReviewUpdate,
     getReviewsForMentor,
-    getLeaderboardData,
-    getMentorProgressData,
+    leaderboardData,
+    mentorProgressData,
+    adminCommentsData,
     addTeam,
     assignMentorToTeam,
     unassignMentorFromTeam
