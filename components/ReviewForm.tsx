@@ -1,7 +1,11 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Team, Review, Criterion, CriterionScore } from '../types';
+<<<<<<< HEAD
 import { PROPOSAL_GUIDELINES_URL } from '../constants';
+=======
+import Modal from './Modal';
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
 
 interface ReviewFormProps {
   team: Team;
@@ -12,17 +16,23 @@ interface ReviewFormProps {
 }
 
 const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack, onSaveReview }) => {
+<<<<<<< HEAD
   const [localScores, setLocalScores] = useState<CriterionScore[]>(
     Array.isArray(review.scores)
       ? (review.scores as CriterionScore[])
       : criteria.map(c => ({ criterionId: c.id, score: null }))
   );
+=======
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [localScores, setLocalScores] = useState<CriterionScore[]>(review.scores);
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
   const [comment, setComment] = useState(review.comment || '');
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // When parent data changes (e.g., after a save), reset local state.
   useEffect(() => {
+<<<<<<< HEAD
     setLocalScores(
       Array.isArray(review.scores)
         ? (review.scores as CriterionScore[])
@@ -31,6 +41,12 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
     setComment(review.comment || '');
     setIsDirty(false);
   }, [review, criteria]);
+=======
+    setLocalScores(review.scores);
+    setComment(review.comment || '');
+    setIsDirty(false);
+  }, [review]);
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
 
   const handleScoreChange = (criterionId: string, value: string) => {
     const numValue = parseInt(value, 10);
@@ -48,8 +64,12 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
   };
 
   const weightedTotal = useMemo(() => {
+<<<<<<< HEAD
     const safeScores = Array.isArray(localScores) ? localScores : [];
     const total = safeScores.reduce((acc, scoreItem) => {
+=======
+    const total = localScores.reduce((acc, scoreItem) => {
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
       const criterion = criteria.find(c => c.id === scoreItem.criterionId);
       if (criterion && scoreItem.score !== null) {
         return acc + scoreItem.score * criterion.weight;
@@ -59,7 +79,11 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
     return total.toFixed(2);
   }, [localScores, criteria]);
 
+<<<<<<< HEAD
   const allScoresProvided = Array.isArray(localScores) && localScores.every(s => s.score !== null);
+=======
+  const allScoresProvided = localScores.every(s => s.score !== null);
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
   
   const handleSubmit = async (isComplete: boolean) => {
     setIsSaving(true);
@@ -147,6 +171,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
                 <p className="text-slate-500 mt-1">Grade each criterion on a scale of 1 to 5.</p>
             </div>
             <div className="flex items-center space-x-2 flex-shrink-0">
+<<<<<<< HEAD
               <a
                 href={PROPOSAL_GUIDELINES_URL}
                 target="_blank"
@@ -166,6 +191,15 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
                   View Proposal
                 </a>
               )}
+=======
+                <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="bg-blue-100 text-blue-800 hover:bg-blue-200 font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center text-sm"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2-2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
+                    View Proposal
+                </button>
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
             </div>
         </div>
         <div className="mb-8 mt-4 border-t border-slate-200"></div>
@@ -225,7 +259,18 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
           {renderSubmitButton()}
         </div>
       </div>
+<<<<<<< HEAD
       {/* Removed old proposal text modal; using external link above if available */}
+=======
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={`Proposal: ${team.id}`}>
+        <div className="text-slate-600 whitespace-pre-wrap">
+            {team.proposalDetails}
+        </div>
+      </Modal>
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
     </div>
   );
 };

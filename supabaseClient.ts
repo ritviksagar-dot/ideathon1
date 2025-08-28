@@ -5,6 +5,7 @@ import type { Database } from './types';
 // Supabase Client Initialization
 // =================================================================================
 // This file initializes the Supabase client. The connection credentials
+
 // (URL and Anon Key) are sourced from Vite environment variables.
 // Create a `.env.local` in the project root with:
 // VITE_SUPABASE_URL="your-supabase-project-url"
@@ -30,3 +31,4 @@ export const supabaseClient: SupabaseClient<Database> = createClient<Database>(S
 		},
 	},
 });
+

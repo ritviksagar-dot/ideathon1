@@ -4,7 +4,11 @@ import type { Mentor, Review, Team } from '../types';
 import { CheckIcon } from './icons/CheckIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
+<<<<<<< HEAD
 import { SCORING_RUBRIC_URL, PROPOSAL_GUIDELINES_URL } from '../constants';
+=======
+import { SCORING_RUBRIC_URL } from '../constants';
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
 
 interface MentorDashboardProps {
   mentor: Mentor;
@@ -34,6 +38,7 @@ const MentorDashboard: React.FC<MentorDashboardProps> = ({ mentor, reviews, team
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold text-slate-800">Your Assigned Proposals</h2>
+<<<<<<< HEAD
         <div className="flex items-center gap-2">
           <a
             href={PROPOSAL_GUIDELINES_URL}
@@ -53,6 +58,17 @@ const MentorDashboard: React.FC<MentorDashboardProps> = ({ mentor, reviews, team
             View Scoring Rubric
           </a>
         </div>
+=======
+        <a
+          href={SCORING_RUBRIC_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center"
+        >
+          <DocumentTextIcon className="h-5 w-5 mr-2" />
+          View Scoring Rubric
+        </a>
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
       </div>
       <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
         <ul className="divide-y divide-slate-200">
@@ -72,12 +88,17 @@ const MentorDashboard: React.FC<MentorDashboardProps> = ({ mentor, reviews, team
                       )}
                     </div>
                     <div>
+<<<<<<< HEAD
                       <p className="text-lg font-semibold text-slate-900">{team.candidate_id}</p>
+=======
+                      <p className="text-lg font-semibold text-slate-900">{team.id}</p>
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
                       <p className={`text-sm font-medium ${review.isCompleted ? 'text-green-700' : 'text-slate-500'}`}>
                         Status: {review.isCompleted ? 'Completed' : 'Pending Review'}
                       </p>
                     </div>
                   </div>
+<<<<<<< HEAD
                   <div className="flex items-center gap-3">
                     {team.proposal_link && (
                       <a
@@ -96,6 +117,14 @@ const MentorDashboard: React.FC<MentorDashboardProps> = ({ mentor, reviews, team
                       {review.isCompleted ? 'Edit Review' : 'Start Review'}
                     </button>
                   </div>
+=======
+                  <button
+                    onClick={() => onSelectTeam(team)}
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-5 rounded-md shadow-sm transition duration-200"
+                  >
+                    {review.isCompleted ? 'Edit Review' : 'Start Review'}
+                  </button>
+>>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
                 </div>
               </li>
             );

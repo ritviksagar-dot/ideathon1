@@ -13,3 +13,4 @@ export const CRITERIA: Criterion[] = [
 // Make sure the document is viewable by anyone with the link.
 export const SCORING_RUBRIC_URL = 'https://docs.google.com/document/d/1FmKUdbpfIr7n3zxoa7upK0ZE8M8xMux5AXrM6bIKCpc/edit?tab=t.0';
 export const PROPOSAL_GUIDELINES_URL = 'https://docs.google.com/document/d/13_7G37wRJ3mT57K3xljSz-kiuNj9pPKrO8hYUQAAeJg/edit?tab=t.0';
+

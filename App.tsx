@@ -62,7 +62,6 @@ const App: React.FC = () => {
         .single();
 
       const { data: existingProfile, error: selectError } = await withTimeout(selectQuery, 30000, 'Fetching profile timed out.');
-
       if (selectError && selectError.code !== 'PGRST116') { // PGRST116: No rows found
         const message = `Failed to fetch your profile. This is often caused by a Row Level Security (RLS) policy in Supabase. Please ensure authenticated users have SELECT permission on the 'mentors' table for their own record.\n\nDetails: ${selectError.message}`;
         console.error("Error fetching mentor profile:", selectError);
