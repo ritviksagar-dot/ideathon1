@@ -1,6 +1,5 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-<<<<<<< HEAD
 import type { Review, Team, Mentor, CriterionScore, LeaderboardEntry, MentorProgress, AdminCommentData } from '../types';
 import { CRITERIA } from '../constants';
 import { supabaseClient } from '../supabaseClient';
@@ -17,31 +16,9 @@ export const useAppData = (user: User | null, showToast: (data: ToastData) => vo
 
   useEffect(() => {
     if (!user) {
-=======
-import type { Review, Team, Mentor, CriterionScore, LeaderboardEntry, MentorProgress, CurrentUser, AdminCommentData } from '../types';
-import { CRITERIA } from '../constants';
-import { supabaseClient } from '../supabaseClient';
-import type { ToastData } from '../components/Toast';
-
-export const useAppData = (currentUser: CurrentUser | null, showToast: (data: ToastData) => void) => {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [mentors, setMentors] = useState<Mentor[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!currentUser || !supabaseClient) {
-      // Not logged in or client not ready, clear data and stop loading
-      setReviews([]);
-      setTeams([]);
-      setMentors([]);
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
       setIsLoading(false);
       return;
     }
-
-<<<<<<< HEAD
     const loadAllData = async () => {
       setIsLoading(true);
       setError(null);
@@ -60,17 +37,6 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
         const isAdmin = userProfile?.isInternal === true;
 
         if (isAdmin) {
-=======
-    const isAdmin = currentUser.user.user_metadata?.role === 'admin';
-
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        if (isAdmin) {
-          // Admin: Fetch all data in parallel for efficiency
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
           const [teamsResult, reviewsResult, mentorsResult] = await Promise.all([
             supabaseClient.from('teams').select('*'),
             supabaseClient.from('reviews').select('*'),
@@ -79,7 +45,6 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
 
           if (teamsResult.error) throw teamsResult.error;
           setTeams(teamsResult.data || []);
-<<<<<<< HEAD
           if (reviewsResult.error) throw reviewsResult.error;
           setReviews(reviewsResult.data || []);
           if (mentorsResult.error) throw mentorsResult.error;
@@ -87,31 +52,10 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
         } else {
           const { data: mentorReviews, error: reviewsError } = await supabaseClient
             .from('reviews').select('*').eq('mentorId', user.id);
-=======
-
-          if (reviewsResult.error) throw reviewsResult.error;
-          const parsedReviews = (reviewsResult.data || []).map(r => ({
-            ...r,
-            scores: Array.isArray(r.scores) ? r.scores : CRITERIA.map(c => ({ criterionId: c.id, score: null })),
-            comment: r.comment ?? null,
-          })) as Review[];
-          setReviews(parsedReviews);
-
-          if (mentorsResult.error) throw mentorsResult.error;
-          setMentors(mentorsResult.data || []);
-        } else {
-          // Mentor: Fetch assigned reviews first, then their associated teams.
-          // This avoids a join that requires a DB relationship to be defined.
-          const { data: mentorReviews, error: reviewsError } = await supabaseClient
-            .from('reviews')
-            .select('*')
-            .eq('mentorId', currentUser.user.id);
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
 
           if (reviewsError) throw reviewsError;
           
           if (mentorReviews && mentorReviews.length > 0) {
-<<<<<<< HEAD
             setReviews(mentorReviews);
             const teamIds = [...new Set(mentorReviews.map(r => r.teamId))];
             const { data: associatedTeams, error: teamsError } = await supabaseClient
@@ -123,53 +67,13 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
       } catch (e: any) {
         console.error("Failed to load application data:", e);
         setError(e.message || "An unknown error occurred while loading data.");
-=======
-            const parsedMentorReviews = (mentorReviews || []).map(r => ({
-                ...r,
-                scores: Array.isArray(r.scores) ? r.scores : CRITERIA.map(c => ({ criterionId: c.id, score: null })),
-                comment: r.comment ?? null,
-            })) as Review[];
-            setReviews(parsedMentorReviews);
-            
-            // Now fetch only the teams associated with these reviews
-            const teamIds = [...new Set(parsedMentorReviews.map(r => r.teamId))];
-            if (teamIds.length > 0) {
-                const { data: associatedTeams, error: teamsError } = await supabaseClient
-                .from('teams')
-                .select('*')
-                .in('id', teamIds);
-                
-                if (teamsError) throw teamsError;
-
-                setTeams(associatedTeams || []);
-            } else {
-                setTeams([]);
-            }
-          } else {
-            setReviews([]);
-            setTeams([]);
-          }
-          // Mentors do not need the full list of other mentors for their dashboard
-          setMentors([]);
-        }
-
-      } catch (e: any) {
-        console.error("Failed to load data from Supabase", e);
-        const errorMessage = e.message || JSON.stringify(e);
-        setError(`Failed to load data. Please check your network connection and ensure RLS is configured correctly if enabled. Error: ${errorMessage}`);
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
       } finally {
         setIsLoading(false);
       }
     };
-<<<<<<< HEAD
     
     loadAllData();
   }, [user]);
-=======
-    loadData();
-  }, [currentUser]);
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
 
   const addTeam = useCallback(async (team: Omit<Team, 'proposalDetails'> & { proposalDetails: string }): Promise<Team | null> => {
     if (!supabaseClient) return null;
@@ -243,11 +147,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
   }, [reviews, showToast]);
 
   const saveReviewUpdate = useCallback(async (reviewId: number, newScores: CriterionScore[], newStatus: boolean, newComment: string): Promise<boolean> => {
-<<<<<<< HEAD
     if (!user || !supabaseClient) {
-=======
-    if (!currentUser || !supabaseClient) {
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
         showToast({ message: "You must be logged in to save changes.", type: 'error'});
         return false;
     }
@@ -257,11 +157,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
         .from('reviews')
         .update({ scores: newScores, isCompleted: newStatus, comment: newComment })
         .eq('id', reviewId)
-<<<<<<< HEAD
         .eq('mentorId', user.id)
-=======
-        .eq('mentorId', currentUser.user.id)
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
         .select()
         .single();
         
@@ -277,11 +173,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
         showToast({ message: 'Review saved!', type: 'success' });
         return true;
     }
-<<<<<<< HEAD
   }, [showToast, user]);
-=======
-  }, [showToast, currentUser]);
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
   
   const getReviewsForMentor = useCallback((mentorId: string) => {
       return reviews.filter(review => review.mentorId === mentorId);
@@ -371,10 +263,7 @@ export const useAppData = (currentUser: CurrentUser | null, showToast: (data: To
   }, [leaderboardData, reviews, mentors]);
 
   return {
-<<<<<<< HEAD
     profile,
-=======
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
     reviews,
     teams,
     mentors,

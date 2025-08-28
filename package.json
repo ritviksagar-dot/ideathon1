@@ -10,17 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-<<<<<<< HEAD
     "@supabase/supabase-js": "^2.55.0",
     "@tailwindcss/vite": "^4.1.12",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "tailwindcss": "^4.1.12"
-=======
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "@supabase/supabase-js": "^2.55.0"
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

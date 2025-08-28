@@ -160,32 +160,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentor
   };
   
   const ManageData = () => {
-<<<<<<< HEAD
+
     const [selectedMentor, setSelectedMentor] = useState<{ [teamId: string]: string }>({});
     const [reviewToUnassign, setReviewToUnassign] = useState<Review | null>(null);
 
-=======
-    const [teamId, setTeamId] = useState('');
-    const [teamName, setTeamName] = useState('');
-    const [proposal, setProposal] = useState('');
-    const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
-    const [selectedMentor, setSelectedMentor] = useState<{ [teamId: string]: string }>({});
-    const [reviewToUnassign, setReviewToUnassign] = useState<Review | null>(null);
-
-    const handleAddTeam = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setIsSubmittingTeam(true);
-      const newTeam = { id: teamId, name: teamName, proposalDetails: proposal };
-      const result = await onAddTeam(newTeam);
-      if(result) {
-        setTeamId('');
-        setTeamName('');
-        setProposal('');
-      }
-      setIsSubmittingTeam(false);
-    };
-
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
     const handleSelectMentor = (teamId: string, mentorId: string) => {
       setSelectedMentor(prev => ({ ...prev, [teamId]: mentorId }));
     };
@@ -193,10 +171,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentor
     const handleAssign = (teamId: string) => {
         const mentorId = selectedMentor[teamId];
         if (!mentorId) {
-<<<<<<< HEAD
-=======
-            // The hook will now show a toast for errors, but a simple alert is fine for client-side validation
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
             alert("Please select a mentor to assign.");
             return;
         }
@@ -214,7 +188,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentor
     return (
       <>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-<<<<<<< HEAD
           {/* Left Column: Instructions */}
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
@@ -231,43 +204,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentor
           {/* Right Column: Assignment Management (Unchanged) */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-md border border-slate-200 p-6">
               <h3 className="text-xl font-bold mb-4">Assign & Unassign Reviewers</h3>
-=======
-          {/* Left Column: Add Team & Info */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
-                <h3 className="text-xl font-bold mb-4">Add a New Team</h3>
-                <form onSubmit={handleAddTeam} className="space-y-4">
-                    <div>
-                        <label htmlFor="teamId" className="block text-sm font-medium text-slate-700">Team ID (e.g., 't1', 'alpha-squad')</label>
-                        <input type="text" id="teamId" value={teamId} onChange={e => setTeamId(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-900" />
-                    </div>
-                    <div>
-                        <label htmlFor="teamName" className="block text-sm font-medium text-slate-700">Team Name</label>
-                        <input type="text" id="teamName" value={teamName} onChange={e => setTeamName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-900" />
-                    </div>
-                    <div>
-                        <label htmlFor="proposal" className="block text-sm font-medium text-slate-700">Policy Proposal Text</label>
-                        <textarea id="proposal" value={proposal} onChange={e => setProposal(e.target.value)} required rows={6} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-900" />
-                    </div>
-                    <button type="submit" disabled={isSubmittingTeam} className="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-slate-400">
-                        {isSubmittingTeam ? 'Adding...' : 'Add Team'}
-                    </button>
-                </form>
-            </div>
-            <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
-                <h3 className="text-xl font-bold mb-2">Manage Mentors</h3>
-                <p className="text-sm text-slate-600">Mentor user accounts are managed in your Supabase project dashboard for security.</p>
-                <ol className="list-decimal list-inside mt-4 text-sm space-y-2">
-                    <li>Go to <span className="font-semibold">Authentication &gt; Users</span> to add/remove mentors.</li>
-                    <li>New mentors will appear in the assignment list after they log in for the first time.</li>
-                </ol>
-            </div>
-          </div>
-          
-          {/* Right Column: Assignment Management */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-md border border-slate-200 p-6">
-              <h3 className="text-xl font-bold mb-4">Assign Reviewers</h3>
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
               <div className="space-y-6">
                 {teams.length > 0 ? teams.map(team => {
                     const assignedReviews = reviews.filter(r => r.teamId === team.id);
@@ -276,7 +212,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentor
 
                     return (
                         <div key={team.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
-<<<<<<< HEAD
                             <div className="flex justify-between items-center mb-2">
                                 <h4 className="font-bold text-slate-800">{team.name}</h4>
                                 {team.proposal_link && (
@@ -290,9 +225,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentor
                                     </a>
                                 )}
                             </div>
-=======
-                            <h4 className="font-bold text-slate-800">{team.name}</h4>
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
                             
                             <div className="mt-2">
                                 <h5 className="text-sm font-semibold text-slate-600 mb-1">Assigned Reviewers:</h5>
@@ -341,19 +273,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ leaderboardData, mentor
                         </div>
                     );
                 }) : (
-<<<<<<< HEAD
+
                   <p className="text-center text-slate-500 py-8">No teams found. Import them via CSV.</p>
-=======
-                  <p className="text-center text-slate-500 py-8">Add a team to begin assigning reviewers.</p>
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
                 )}
               </div>
           </div>
         </div>
-<<<<<<< HEAD
-        
-=======
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
         {reviewToUnassign && (
             <Modal
                 isOpen={!!reviewToUnassign}

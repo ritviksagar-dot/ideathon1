@@ -13,35 +13,23 @@ export type Database = {
         Row: {
           id: string;
           name: string;
-<<<<<<< HEAD
           candidate_id: string;
           proposalDetails: string;
           proposal_link?: string | null;
-=======
-          proposalDetails: string;
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
         };
         Insert: {
           id: string;
           name: string;
-<<<<<<< HEAD
           candidate_id: string;
           proposalDetails: string;
           proposal_link?: string | null;
-=======
-          proposalDetails: string;
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
         };
         Update: {
           id?: string;
           name?: string;
-<<<<<<< HEAD
           candidate_id?: string;
           proposalDetails?: string;
           proposal_link?: string | null;
-=======
-          proposalDetails?: string;
->>>>>>> dfd55312ebc4ca2cea2cd5a0e31679356ec05922
         };
         Relationships: [];
       };
