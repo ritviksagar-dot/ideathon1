@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Team, Review, Criterion, CriterionScore } from '../types';
 import { PROPOSAL_GUIDELINES_URL } from '../constants';
+import { useDraftPersistence } from '../hooks/useDraftPersistence';
 
 interface ReviewFormProps {
   team: Team;
@@ -12,25 +13,85 @@ interface ReviewFormProps {
 }
 
 const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack, onSaveReview }) => {
-  const [localScores, setLocalScores] = useState<CriterionScore[]>(
-    Array.isArray(review.scores)
-      ? (review.scores as CriterionScore[])
-      : criteria.map(c => ({ criterionId: c.id, score: null }))
-  );
-  const [comment, setComment] = useState(review.comment || '');
+  const { loadDraft, saveDraft, clearDraft } = useDraftPersistence(review.id, review.mentorId);
+  
+  // Initialize state with draft data if available, otherwise use review data
+  const initializeState = () => {
+    const draft = loadDraft();
+    if (draft && !review.isCompleted) {
+      return {
+        scores: draft.scores,
+        comment: draft.comment
+      };
+    }
+    return {
+      scores: Array.isArray(review.scores)
+        ? (review.scores as CriterionScore[])
+        : criteria.map(c => ({ criterionId: c.id, score: null })),
+      comment: review.comment || ''
+    };
+  };
+
+  const initialState = initializeState();
+  const [localScores, setLocalScores] = useState<CriterionScore[]>(initialState.scores);
+  const [comment, setComment] = useState(initialState.comment);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
 
-  // When parent data changes (e.g., after a save), reset local state.
+  // Initialize state on mount and when review changes
   useEffect(() => {
-    setLocalScores(
-      Array.isArray(review.scores)
-        ? (review.scores as CriterionScore[])
-        : criteria.map(c => ({ criterionId: c.id, score: null }))
-    );
-    setComment(review.comment || '');
+    if (review.isCompleted) {
+      // If review is completed, clear any draft and use saved data
+      clearDraft();
+      setLocalScores(
+        Array.isArray(review.scores)
+          ? (review.scores as CriterionScore[])
+          : criteria.map(c => ({ criterionId: c.id, score: null }))
+      );
+      setComment(review.comment || '');
+      setHasDraft(false);
+    } else {
+      // For incomplete reviews, check what data we have
+      const savedScores = Array.isArray(review.scores) ? (review.scores as CriterionScore[]) : [];
+      const savedComment = review.comment || '';
+      const hasExistingSavedData = savedScores.some(s => s.score !== null) || savedComment.trim().length > 0;
+      
+      if (hasExistingSavedData) {
+        // Use saved data and clear any conflicting draft
+        clearDraft();
+        setLocalScores(savedScores.length > 0 ? savedScores : criteria.map(c => ({ criterionId: c.id, score: null })));
+        setComment(savedComment);
+        setHasDraft(false);
+      } else {
+        // Only use draft if no saved data exists
+        const draft = loadDraft();
+        if (draft) {
+          // Validate draft scores match current criteria
+          const validDraftScores = criteria.map(c => {
+            const draftScore = draft.scores.find(s => s.criterionId === c.id);
+            return draftScore || { criterionId: c.id, score: null };
+          });
+          
+          setLocalScores(validDraftScores);
+          setComment(draft.comment);
+          setHasDraft(true);
+        } else {
+          setLocalScores(criteria.map(c => ({ criterionId: c.id, score: null })));
+          setComment('');
+          setHasDraft(false);
+        }
+      }
+    }
     setIsDirty(false);
-  }, [review, criteria]);
+  }, [review.id, review.isCompleted, criteria.length]);
+
+  // Auto-save draft when scores or comment change
+  useEffect(() => {
+    if (isDirty && !review.isCompleted) {
+      saveDraft(localScores, comment);
+    }
+  }, [localScores, comment, isDirty, review.isCompleted, saveDraft]);
 
   const handleScoreChange = (criterionId: string, value: string) => {
     const numValue = parseInt(value, 10);
@@ -65,7 +126,12 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
   const handleSubmit = async (isComplete: boolean) => {
     setIsSaving(true);
     try {
-        await onSaveReview(localScores, isComplete, comment);
+        const success = await onSaveReview(localScores, isComplete, comment);
+        if (success) {
+          // Clear draft on successful save
+          clearDraft();
+          setHasDraft(false);
+        }
     } catch(e) {
         console.error("Error submitting review", e);
         // The data hook will show a toast error message
@@ -73,6 +139,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
         setIsSaving(false);
     }
   };
+
 
   const renderSubmitButton = () => {
     if (isSaving) {
@@ -156,10 +223,23 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
       </button>
 
       <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200">
+        {hasDraft && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <span className="text-blue-800 font-medium">Draft restored from previous session</span>
+            </div>
+          </div>
+        )}
         <div className="flex justify-between items-start mb-2">
             <div>
                 <h2 className="text-3xl font-bold text-slate-900">Reviewing Proposal {team.id}</h2>
                 <p className="text-slate-500 mt-1">Grade each criterion on a scale of 1 to 5.</p>
+                {!review.isCompleted && (
+                  <p className="text-xs text-slate-400 mt-1">💾 Your progress is automatically saved as you type</p>
+                )}
             </div>
             <div className="flex items-center space-x-2 flex-shrink-0">
               <a
@@ -236,6 +316,14 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
         <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xl font-bold text-slate-800">
             Total Weighted Score: <span className="text-blue-600">{weightedTotal} / 5.00</span>
+            {isDirty && !review.isCompleted && (
+              <div className="text-xs text-green-600 mt-1 flex items-center">
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Draft saved
+              </div>
+            )}
           </div>
           {renderSubmitButton()}
         </div>
