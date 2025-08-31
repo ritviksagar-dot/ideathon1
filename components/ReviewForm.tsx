@@ -60,6 +60,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
   }, [localScores, criteria]);
 
   const allScoresProvided = Array.isArray(localScores) && localScores.every(s => s.score !== null);
+  const commentProvided = comment.trim().length > 0;
   
   const handleSubmit = async (isComplete: boolean) => {
     setIsSaving(true);
@@ -91,12 +92,19 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
       
     // Case 1: Review is not yet completed.
     if (!review.isCompleted) {
+      const canSubmit = allScoresProvided && commentProvided;
+      const tooltipMessage = !allScoresProvided 
+        ? "Please provide a score for all criteria first" 
+        : !commentProvided 
+        ? "Please provide comments before submitting" 
+        : "";
+      
       return (
         <button
           onClick={() => handleSubmit(true)}
-          disabled={!allScoresProvided}
+          disabled={!canSubmit}
           className="w-full sm:w-auto px-6 py-3 font-bold rounded-md transition duration-200 bg-green-500 hover:bg-green-600 text-white disabled:bg-slate-300 disabled:cursor-not-allowed disabled:text-slate-500"
-          title={!allScoresProvided ? "Please provide a score for all criteria first" : ""}
+          title={tooltipMessage}
         >
           Mark as Complete
         </button>
@@ -105,12 +113,19 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
 
     // Case 2: Review is completed, but has been modified locally.
     if (isDirty) {
+      const canSubmit = allScoresProvided && commentProvided;
+      const tooltipMessage = !allScoresProvided 
+        ? "Cannot submit changes with missing scores" 
+        : !commentProvided 
+        ? "Please provide comments before submitting" 
+        : "Submit your changes";
+      
       return (
         <button
           onClick={() => handleSubmit(true)}
-          disabled={!allScoresProvided}
+          disabled={!canSubmit}
           className="w-full sm:w-auto px-6 py-3 font-bold rounded-md transition duration-200 bg-blue-500 hover:bg-blue-600 text-white disabled:bg-slate-300 disabled:cursor-not-allowed disabled:text-slate-500"
-          title={!allScoresProvided ? "Cannot submit changes with missing scores" : "Submit your changes"}
+          title={tooltipMessage}
         >
           Submit Changes
         </button>
@@ -200,10 +215,10 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
         
         <div className="mt-8 pt-6 border-t border-slate-200">
             <label htmlFor="comment" className="block text-lg font-semibold text-slate-700 mb-2">
-                Comments & Rationale
+                Comments & Rationale <span className="text-red-600">*</span>
             </label>
             <p className="text-sm text-slate-500 mb-3">
-                Optionally, explain the reasoning for your scores. This feedback is valuable for the review committee.
+                Please explain the reasoning for your scores. This feedback is required and valuable for the review committee.
             </p>
             <textarea
                 id="comment"

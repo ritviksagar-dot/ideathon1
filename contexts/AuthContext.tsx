@@ -5,7 +5,7 @@ import { supabaseClient } from '../supabaseClient';
 interface AuthContextType {
   session: Session | null;
   user: User | null;
-  isLoading: boolean; // True only during the initial, fast auth check
+  isLoading: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -21,14 +21,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check session on initial load to quickly establish auth state
     supabaseClient.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
     });
 
-    // Listen for any future auth changes (sign in, sign out, token refresh)
     const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
@@ -40,9 +38,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // --- THIS IS THE ROBUST LOGOUT FUNCTION ---
   const signOut = async () => {
-    await supabaseClient.auth.signOut();
+    try {
+      // We try to sign out. This is the part that might throw the error.
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) {
+        // Even if it's not the session missing error, we log it.
+        console.error('Error signing out:', error);
+      }
+    } catch (error) {
+      // If it fails (e.g., AuthSessionMissingError), we catch it here so it
+      // doesn't crash the app. We can log it for debugging.
+      console.warn('Caught harmless error during sign out:', error);
+    } finally {
+      // This block runs NO MATTER WHAT. Whether the sign out succeeded or failed,
+      // we ensure the local application state is cleared, which is the most
+      // important step for redirecting the user to the login page.
+      setSession(null);
+      setUser(null);
+    }
   };
+  // --- END OF ROBUST LOGOUT FUNCTION ---
 
   const value = { session, user, isLoading, signOut };
 

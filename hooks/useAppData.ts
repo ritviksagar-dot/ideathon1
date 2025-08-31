@@ -1,72 +1,110 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Review, Team, Mentor, CriterionScore, LeaderboardEntry, MentorProgress, AdminCommentData } from '../types';
+import type { Review, Team, Mentor, CriterionScore, LeaderboardEntry, MentorProgress, AdminCommentData, ToastData } from '../types';
 import { CRITERIA } from '../constants';
 import { supabaseClient } from '../supabaseClient';
-import type { ToastData } from '../components/Toast';
 import { User } from '@supabase/supabase-js';
+
+const escapeCsvValue = (value: any): string => {
+  const stringValue = value === null || value === undefined ? '' : String(value);
+  if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+};
 
 export const useAppData = (user: User | null, showToast: (data: ToastData) => void) => {
   const [profile, setProfile] = useState<Mentor | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [mentors, setMentors] = useState<Mentor[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // Represents ALL data loading
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
+    if (!user) { setIsLoading(false); return; }
+
     const loadAllData = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        // Step 1: Fetch the user's profile. This is the critical step that was failing.
-        const { data: userProfile, error: profileError } = await supabaseClient
-          .from('mentors')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+        let { data: userProfile, error: profileError } = await supabaseClient.from('mentors').select('*').eq('id', user.id).single();
 
-        if (profileError) throw new Error(`Failed to load your profile. Details: ${profileError.message}`);
+        if (profileError && profileError.code === 'PGRST116') {
+          const profileName = user.email?.split('@')[0] || 'New Mentor';
+          const { data: newProfile, error: upsertError } = await supabaseClient.from('mentors').upsert({ id: user.id, name: profileName, isInternal: false }).select().single();
+          if (upsertError) throw new Error(`Could not create profile: ${upsertError.message}`);
+          userProfile = newProfile;
+        } else if (profileError) {
+          throw new Error(`Error fetching profile: ${profileError.message}`);
+        }
         setProfile(userProfile);
-
-        // Step 2: Fetch the rest of the data based on the profile.
+        
         const isAdmin = userProfile?.isInternal === true;
-
         if (isAdmin) {
+          // Load all data for admin users
           const [teamsResult, reviewsResult, mentorsResult] = await Promise.all([
-            supabaseClient.from('teams').select('*'),
-            supabaseClient.from('reviews').select('*'),
-            supabaseClient.from('mentors').select('*'),
+            Promise.race([
+              supabaseClient.from('teams').select('*'),
+              new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+                setTimeout(() => reject({ data: null, error: { message: 'Teams query timeout' } }), 10000)
+              )
+            ]),
+            Promise.race([
+              supabaseClient.from('reviews').select('*'),
+              new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+                setTimeout(() => reject({ data: null, error: { message: 'Reviews query timeout' } }), 10000)
+              )
+            ]),
+            Promise.race([
+              supabaseClient.from('mentors').select('*'),
+              new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+                setTimeout(() => reject({ data: null, error: { message: 'Mentors query timeout' } }), 10000)
+              )
+            ])
           ]);
 
-          if (teamsResult.error) throw teamsResult.error;
+          if (teamsResult.error) throw new Error(`Failed to load teams: ${teamsResult.error.message}`);
+          if (reviewsResult.error) throw new Error(`Failed to load reviews: ${reviewsResult.error.message}`);
+          if (mentorsResult.error) throw new Error(`Failed to load mentors: ${mentorsResult.error.message}`);
+
           setTeams(teamsResult.data || []);
-          if (reviewsResult.error) throw reviewsResult.error;
           setReviews(reviewsResult.data || []);
-          if (mentorsResult.error) throw mentorsResult.error;
           setMentors(mentorsResult.data || []);
         } else {
-          const { data: mentorReviews, error: reviewsError } = await supabaseClient
-            .from('reviews').select('*').eq('mentorId', user.id);
+          // Load mentor-specific data
+          const reviewsPromise = Promise.race([
+            supabaseClient.from('reviews').select('*').eq('mentorId', user.id),
+            new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+              setTimeout(() => reject({ data: null, error: { message: 'Reviews query timeout' } }), 10000)
+            )
+          ]);
 
-          if (reviewsError) throw reviewsError;
-          
+          const { data: mentorReviews, error: reviewsError } = await reviewsPromise;
+          if (reviewsError) throw new Error(`Failed to load your reviews: ${reviewsError.message}`);
+
           if (mentorReviews && mentorReviews.length > 0) {
             setReviews(mentorReviews);
             const teamIds = [...new Set(mentorReviews.map(r => r.teamId))];
-            const { data: associatedTeams, error: teamsError } = await supabaseClient
-              .from('teams').select('*').in('id', teamIds);
-            if (teamsError) throw teamsError;
+            
+            const teamsPromise = Promise.race([
+              supabaseClient.from('teams').select('*').in('id', teamIds),
+              new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+                setTimeout(() => reject({ data: null, error: { message: 'Teams query timeout' } }), 10000)
+              )
+            ]);
+
+            const { data: associatedTeams, error: teamsError } = await teamsPromise;
+            if (teamsError) throw new Error(`Failed to load team data: ${teamsError.message}`);
+            
             setTeams(associatedTeams || []);
+          } else {
+            // No reviews assigned - set empty arrays
+            setReviews([]);
+            setTeams([]);
           }
         }
       } catch (e: any) {
-        console.error("Failed to load application data:", e);
-        setError(e.message || "An unknown error occurred while loading data.");
+        setError(e.message);
       } finally {
         setIsLoading(false);
       }
@@ -75,117 +113,74 @@ export const useAppData = (user: User | null, showToast: (data: ToastData) => vo
     loadAllData();
   }, [user]);
 
-  const addTeam = useCallback(async (team: Omit<Team, 'proposalDetails'> & { proposalDetails: string }): Promise<Team | null> => {
-    if (!supabaseClient) return null;
-    const { data, error } = await supabaseClient.from('teams').insert(team).select().single();
-    if (error) {
-      setError(error.message);
-      showToast({ message: `Error: ${error.message}`, type: 'error' });
-      return null;
-    }
-    if (data) {
-      setTeams(prev => [...prev, data]);
-      showToast({ message: `Team "${data.name}" added successfully!`, type: 'success' });
-    }
-    return data;
-  }, [showToast]);
-
-  const assignMentorToTeam = useCallback(async (teamId: string, mentorId: string) => {
-    if (!supabaseClient) return;
-    
-    // Prevent duplicate assignments
-    const existingAssignment = reviews.find(r => r.teamId === teamId && r.mentorId === mentorId);
-    if (existingAssignment) {
-      showToast({ message: "This mentor is already assigned to this team.", type: 'error' });
-      return;
-    }
-
-    const newReview = {
-      teamId,
-      mentorId,
-      scores: CRITERIA.map(c => ({ criterionId: c.id, score: null })),
-      isCompleted: false,
-      comment: null,
-    };
-
-    const { data: insertedReview, error } = await supabaseClient
-      .from('reviews')
-      .insert(newReview)
-      .select()
-      .single();
-
-    if (error) {
-      setError(error.message);
-      showToast({ message: `Failed to create assignment: ${error.message}`, type: 'error' });
-    } else if (insertedReview) {
-      setReviews(prev => [...prev, insertedReview as Review]);
-      showToast({ message: 'Assignment created successfully.', type: 'success' });
-    }
-  }, [reviews, showToast]);
-
-  const unassignMentorFromTeam = useCallback(async (reviewId: number) => {
-    if (!supabaseClient) return;
-
-    const originalReviews = reviews;
-    setReviews(prev => prev.filter(r => r.id !== reviewId)); // Optimistic update
-
-    const { data, error } = await supabaseClient
-        .from('reviews')
-        .delete()
-        .eq('id', reviewId)
-        .select()
-        .single();
-
-    if (error || !data) {
-        const errorMessage = error?.message || 'Record not found or you may not have permission.';
-        setError(errorMessage);
-        setReviews(originalReviews); // Rollback
-        showToast({ message: `Failed to remove assignment: ${errorMessage}`, type: 'error' });
-    } else {
-        showToast({ message: 'Assignment removed successfully.', type: 'success' });
-    }
-  }, [reviews, showToast]);
-
-  const saveReviewUpdate = useCallback(async (reviewId: number, newScores: CriterionScore[], newStatus: boolean, newComment: string): Promise<boolean> => {
-    if (!user || !supabaseClient) {
-        showToast({ message: "You must be logged in to save changes.", type: 'error'});
-        return false;
-    }
-
-    // Update the database first
-    const { data: updatedReview, error } = await supabaseClient
-        .from('reviews')
-        .update({ scores: newScores, isCompleted: newStatus, comment: newComment })
-        .eq('id', reviewId)
-        .eq('mentorId', user.id)
-        .select()
-        .single();
-        
-    if (error || !updatedReview) {
-        const errorMessage = error?.message || "Failed to save. This might be due to a permissions issue or if the review does not belong to you.";
-        showToast({ message: `Error: ${errorMessage}`, type: 'error'});
-        return false;
-    } else {
-        // Update local state on success
-        setReviews(prevReviews => 
-            prevReviews.map(r => r.id === reviewId ? (updatedReview as Review) : r)
-        );
-        showToast({ message: 'Review saved!', type: 'success' });
-        return true;
-    }
-  }, [showToast, user]);
+  const getReviewsForMentor = useCallback((mentorId: string) => reviews.filter(review => review.mentorId === mentorId), [reviews]);
   
-  const getReviewsForMentor = useCallback((mentorId: string) => {
-      return reviews.filter(review => review.mentorId === mentorId);
-  }, [reviews]);
+  // --- FIXED OPTIMISTIC SAVE FUNCTION WITH ROLLBACK ---
+  const saveReviewUpdate = useCallback(async (
+    reviewId: number,
+    scores: CriterionScore[],
+    isCompleted: boolean,
+    comment: string
+  ): Promise<boolean> => {
+    if (!user) {
+      showToast({ message: "You must be logged in to save.", type: 'error' });
+      return false;
+    }
+
+    // Store original state for potential rollback
+    const originalReview = reviews.find(r => r.id === reviewId);
+    if (!originalReview) {
+      showToast({ message: "Review not found.", type: 'error' });
+      return false;
+    }
+
+    try {
+      // 1. OPTIMISTIC UPDATE: Update UI immediately for responsive feel
+      setReviews(currentReviews =>
+        currentReviews.map(r =>
+          r.id === reviewId ? { ...r, scores, isCompleted, comment } : r
+        )
+      );
+
+      // 2. DATABASE UPDATE: Attempt to persist to database
+      const { error } = await supabaseClient
+        .from('reviews')
+        .update({ scores, isCompleted, comment })
+        .eq('id', reviewId)
+        .eq('mentorId', user.id); // Security check
+
+      if (error) {
+        throw error;
+      }
+      
+      // 3. SUCCESS: Confirm save to user
+      showToast({ message: 'Review saved successfully!', type: 'success' });
+      return true;
+    } catch (e: any) {
+      console.error('Failed to save review:', e);
+      
+      // 4. ROLLBACK: Revert UI to original state on failure
+      setReviews(currentReviews =>
+        currentReviews.map(r =>
+          r.id === reviewId ? originalReview : r
+        )
+      );
+      
+      showToast({ 
+        message: `Failed to save review: ${e.message}. Please try again.`, 
+        type: 'error' 
+      });
+      return false;
+    }
+  }, [user, showToast, reviews]);
   
   const calculateWeightedScore = useCallback((scores: CriterionScore[]): number => {
     const totalScore = scores.reduce((acc, currentScore) => {
-        const criterion = CRITERIA.find(c => c.id === currentScore.criterionId);
-        if (criterion && currentScore.score !== null) {
-            return acc + currentScore.score * criterion.weight;
-        }
-        return acc;
+      const criterion = CRITERIA.find(c => c.id === currentScore.criterionId);
+      if (criterion && currentScore.score !== null) {
+        return acc + currentScore.score * criterion.weight;
+      }
+      return acc;
     }, 0);
     return parseFloat(totalScore.toFixed(2));
   }, []);
@@ -200,11 +195,11 @@ export const useAppData = (user: User | null, showToast: (data: ToastData) => vo
       }
       
       const mentor = mentors.find(m => m.id === review.mentorId);
-      if (review.isCompleted) {
+      if (review.isCompleted && Array.isArray(review.scores)) {
         const weightedScore = calculateWeightedScore(review.scores as CriterionScore[]);
         teamScores[review.teamId].scores.push(weightedScore);
-        if(mentor) {
-             teamScores[review.teamId].reviewers.push({ name: mentor.name, score: weightedScore });
+        if (mentor) {
+          teamScores[review.teamId].reviewers.push({ name: mentor.name, score: weightedScore });
         }
       }
     });
@@ -225,10 +220,9 @@ export const useAppData = (user: User | null, showToast: (data: ToastData) => vo
     });
 
     leaderboard.sort((a, b) => b.averageScore - a.averageScore);
-
     return leaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
   }, [reviews, teams, mentors, calculateWeightedScore]);
-  
+
   const mentorProgressData = useMemo((): MentorProgress[] => {
     return mentors.map(mentor => {
       const assignedReviews = reviews.filter(r => r.mentorId === mentor.id);
@@ -243,39 +237,63 @@ export const useAppData = (user: User | null, showToast: (data: ToastData) => vo
   }, [reviews, mentors]);
 
   const adminCommentsData = useMemo((): AdminCommentData[] => {
-    // This is based on leaderboardData to get the rank and team info easily
     return leaderboardData.map(entry => {
-        const teamReviews = reviews.filter(r => r.teamId === entry.team.id);
-        const comments = teamReviews.map(review => {
-            const mentor = mentors.find(m => m.id === review.mentorId);
-            return {
-                mentorName: mentor?.name || 'Unknown Mentor',
-                comment: review.comment || null
-            };
-        }).sort((a, b) => a.mentorName.localeCompare(b.mentorName));
-
+      const teamReviews = reviews.filter(r => r.teamId === entry.team.id);
+      const comments = teamReviews.map(review => {
+        const mentor = mentors.find(m => m.id === review.mentorId);
         return {
-            rank: entry.rank,
-            team: entry.team,
-            comments: comments
+          mentorName: mentor?.name || 'Unknown Mentor',
+          comment: review.comment || null
         };
+      }).sort((a, b) => a.mentorName.localeCompare(b.mentorName));
+
+      return {
+        rank: entry.rank,
+        team: entry.team,
+        comments: comments
+      };
     });
   }, [leaderboardData, reviews, mentors]);
 
-  return {
-    profile,
-    reviews,
-    teams,
-    mentors,
-    isLoading,
-    error,
-    saveReviewUpdate,
-    getReviewsForMentor,
-    leaderboardData,
-    mentorProgressData,
-    adminCommentsData,
-    addTeam,
-    assignMentorToTeam,
-    unassignMentorFromTeam
+  const triggerCsvDownload = (csvContent: string, fileName: string) => {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
+
+  const exportRankingsToCSV = useCallback(() => {
+    if (leaderboardData.length === 0) {
+      showToast({ message: 'No ranking data to export.', type: 'error' });
+      return;
+    }
+    const headers = ['Rank', 'Team Name', 'Candidate ID', 'Average Score', 'Completed Reviews', 'Total Reviews'];
+    const rows = leaderboardData.map(entry => [
+      entry.rank, entry.team.name, entry.team.candidate_id, entry.averageScore.toFixed(2), entry.completedReviews, entry.totalReviews
+    ].map(escapeCsvValue).join(','));
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    triggerCsvDownload(csvContent, `team_rankings_${new Date().toISOString().split('T')[0]}.csv`);
+  }, [leaderboardData, showToast]);
+
+  const exportCommentsToCSV = useCallback(() => {
+    if (adminCommentsData.length === 0) {
+      showToast({ message: 'No comment data to export.', type: 'error' });
+      return;
+    }
+    const headers = ['Rank', 'Team Name', 'Candidate ID', 'Mentor Name', 'Comment'];
+    const rows = adminCommentsData.flatMap(teamEntry => 
+      teamEntry.comments.map(comment => [
+        teamEntry.rank, teamEntry.team.name, teamEntry.team.candidate_id, comment.mentorName, comment.comment || ''
+      ].map(escapeCsvValue).join(','))
+    );
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    triggerCsvDownload(csvContent, `mentor_comments_${new Date().toISOString().split('T')[0]}.csv`);
+  }, [adminCommentsData, showToast]);
+
+  return { profile, reviews, teams, mentors, isLoading, error, leaderboardData, mentorProgressData, adminCommentsData, getReviewsForMentor, saveReviewUpdate, exportRankingsToCSV, exportCommentsToCSV };
 };

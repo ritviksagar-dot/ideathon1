@@ -1,109 +1,115 @@
-
+// --- START OF FILE: src/components/MentorDashboard.tsx ---
 import React from 'react';
-import type { Mentor, Review, Team } from '../types';
-import { CheckIcon } from './icons/CheckIcon';
-import { PencilIcon } from './icons/PencilIcon';
-import { DocumentTextIcon } from './icons/DocumentTextIcon';
-import { SCORING_RUBRIC_URL, PROPOSAL_GUIDELINES_URL } from '../constants';
+import type { Review, Team } from '../types';
+import { SCORING_RUBRIC_URL, PROPOSAL_GUIDELINES_URL, CRITERIA } from '../constants';
 
 interface MentorDashboardProps {
-  mentor: Mentor;
-  reviews: Review[];
+  assignedReviews: Review[];
   teams: Team[];
-  onSelectTeam: (team: Team) => void;
+  onSelectReview: (review: Review) => void;
 }
 
-const MentorDashboard: React.FC<MentorDashboardProps> = ({ mentor, reviews, teams, onSelectTeam }) => {
-  const getTeamById = (id: string) => teams.find(t => t.id === id);
-
-  if (reviews.length === 0) {
+const MentorDashboard: React.FC<MentorDashboardProps> = ({ assignedReviews, teams, onSelectReview }) => {
+  if (assignedReviews.length === 0) {
     return (
-      <div className="text-center bg-white p-12 rounded-xl shadow-md border border-slate-200">
-        <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-        </svg>
-        <h3 className="mt-4 text-xl font-semibold text-slate-800">No Proposals Assigned Yet</h3>
-        <p className="mt-2 text-slate-500">
-          Your dashboard is ready. As soon as the administrator generates the review assignments, they will appear here.
-        </p>
+      <div className="text-center p-8 bg-white rounded-xl shadow-md">
+        <h2 className="text-2xl font-bold text-slate-800">No Proposals Assigned</h2>
+        <p className="mt-2 text-slate-600">You do not have any proposals to review at this time.</p>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-slate-800">Your Assigned Proposals</h2>
-        <div className="flex items-center gap-2">
-          <a
-            href={PROPOSAL_GUIDELINES_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-white border border-blue-200 hover:bg-blue-50 text-blue-600 font-semibold py-2 px-4 rounded-md transition duration-200"
-          >
-            Proposal Guidelines
-          </a>
-          <a
-            href={SCORING_RUBRIC_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center"
-          >
-            <DocumentTextIcon className="h-5 w-5 mr-2" />
-            View Scoring Rubric
-          </a>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-slate-800">Your Assigned Proposals</h1>
+      
+      {/* Scoring Rubric and Guidelines Section */}
+      <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+        <h2 className="text-xl font-bold text-blue-800 mb-4">Review Guidelines & Scoring Rubric</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-3">Quick Reference Links</h3>
+            <div className="space-y-2">
+              <a
+                href={SCORING_RUBRIC_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition mr-3"
+              >
+                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 14H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                </svg>
+                Scoring Rubric
+              </a>
+              <a
+                href={PROPOSAL_GUIDELINES_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 transition"
+              >
+                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 14H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                </svg>
+                Policy Guidelines
+              </a>
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-3">Scoring Criteria</h3>
+            <div className="space-y-2 text-sm">
+              {CRITERIA.map(criterion => (
+                <div key={criterion.id} className="flex justify-between items-center bg-white px-3 py-2 rounded border">
+                  <span className="font-medium text-slate-700">{criterion.name}</span>
+                  <span className="text-blue-600 font-semibold">{(criterion.weight * 100).toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 border border-blue-200">
+          <h4 className="font-semibold text-slate-800 mb-2">Important Reminders:</h4>
+          <ul className="text-sm text-slate-600 space-y-1">
+            <li>• All scores (1-5) and comments are <strong>required</strong> before submission</li>
+            <li>• Use the scoring rubric to ensure consistent evaluation</li>
+            <li>• Provide detailed feedback in comments to help teams improve</li>
+            <li>• Review the policy guidelines to understand evaluation criteria</li>
+          </ul>
         </div>
       </div>
-      <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-        <ul className="divide-y divide-slate-200">
-          {reviews.map(review => {
-            const team = getTeamById(review.teamId);
-            if (!team) return null;
+      {assignedReviews.map(review => {
+        const team = teams.find(t => t.id === review.teamId);
+        if (!team) {
+          console.warn(`Data integrity issue: Review ID ${review.id} references non-existent teamId '${review.teamId}'.`);
+          return null;
+        }
 
-            return (
-              <li key={review.teamId} className="p-4 sm:p-6 hover:bg-slate-50 transition duration-150">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className={`mr-4 p-2 rounded-full ${review.isCompleted ? 'bg-green-100' : 'bg-slate-200'}`}>
-                      {review.isCompleted ? (
-                        <CheckIcon className="h-6 w-6 text-green-600" />
-                      ) : (
-                        <PencilIcon className="h-6 w-6 text-slate-500" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-lg font-semibold text-slate-900">{team.candidate_id}</p>
-                      <p className={`text-sm font-medium ${review.isCompleted ? 'text-green-700' : 'text-slate-500'}`}>
-                        Status: {review.isCompleted ? 'Completed' : 'Pending Review'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {team.proposal_link && (
-                      <a
-                        href={team.proposal_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-2 px-4 rounded-md border border-slate-300 transition"
-                      >
-                        View Proposal
-                      </a>
-                    )}
-                    <button
-                      onClick={() => onSelectTeam(team)}
-                      className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-5 rounded-md shadow-sm transition duration-200"
-                    >
-                      {review.isCompleted ? 'Edit Review' : 'Start Review'}
-                    </button>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+        return (
+          <div key={review.id} className="bg-white rounded-xl shadow-md p-6 flex flex-col sm:flex-row justify-between items-start gap-4">
+            <div>
+              <h3 className="text-xl font-bold text-slate-800">{team.candidate_id}</h3>
+              <p className={`mt-2 text-sm font-semibold ${review.isCompleted ? 'text-green-600' : 'text-yellow-600'}`}>
+                Status: {review.isCompleted ? 'Completed' : 'Pending Review'}
+              </p>
+            </div>
+            <div className="flex items-center gap-4 w-full sm:w-auto flex-shrink-0">
+              {team.proposal_link && (
+                <a href={team.proposal_link} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto text-center px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-md border border-slate-300 hover:bg-slate-200 transition">
+                  View Proposal
+                </a>
+              )}
+              <button onClick={() => onSelectReview(review)} className="w-full sm:w-auto text-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition">
+                {review.isCompleted ? 'Edit Review' : 'Start Review'}
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
 
 export default MentorDashboard;
+// --- END OF FILE: src/components/MentorDashboard.tsx ---

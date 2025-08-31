@@ -56,7 +56,7 @@ export type Database = {
           id: number;
           teamId: string;
           mentorId: string;
-          scores: any;
+          scores: CriterionScore[];
           isCompleted: boolean;
           comment: string | null;
         };
@@ -64,7 +64,7 @@ export type Database = {
           id?: number;
           teamId: string;
           mentorId: string;
-          scores: any;
+          scores: CriterionScore[];
           isCompleted: boolean;
           comment?: string | null;
         };
@@ -72,7 +72,7 @@ export type Database = {
           id?: number;
           teamId?: string;
           mentorId?: string;
-          scores?: any;
+          scores?: CriterionScore[];
           isCompleted?: boolean;
           comment?: string | null;
         };
@@ -124,4 +124,10 @@ export interface CurrentUser {
   session: AuthSession;
   user: User;
   profile: Mentor | null;
+}
+
+export interface ToastData {
+  message: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  duration?: number;
 }
