@@ -1,7 +1,6 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Team, Review, Criterion, CriterionScore } from '../types';
-import { PROPOSAL_GUIDELINES_URL } from '../constants';
+import { PROPOSAL_GUIDELINES_URL, SCORING_RUBRIC_URL, CRITERIA } from '../constants';
 import { useDraftPersistence } from '../hooks/useDraftPersistence';
 
 interface ReviewFormProps {
@@ -242,6 +241,17 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ team, review, criteria, onBack,
                 )}
             </div>
             <div className="flex items-center space-x-2 flex-shrink-0">
+              <a
+                href={SCORING_RUBRIC_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white text-green-600 border border-green-200 hover:bg-green-50 font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center text-sm"
+              >
+                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 14H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                </svg>
+                Scoring Rubric
+              </a>
               <a
                 href={PROPOSAL_GUIDELINES_URL}
                 target="_blank"

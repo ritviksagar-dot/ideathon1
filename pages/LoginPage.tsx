@@ -43,13 +43,21 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center h-screen bg-slate-100">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 px-4 py-8">
+      {/* CrashFree India Branding */}
+      <div className="mb-8 text-center">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-blue-600 tracking-wide">
+          CrashFree India
+        </h1>
+        <div className="mt-2 w-24 sm:w-32 md:w-40 h-1 bg-blue-600 mx-auto rounded-full"></div>
+      </div>
+
+      <div className="w-full max-w-md p-6 sm:p-8 space-y-6 bg-white rounded-xl shadow-lg">
         <div>
-          <h2 className="text-3xl font-bold text-center text-slate-800">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center text-slate-800">
             Policy Proposal Review
           </h2>
-          <p className="mt-2 text-center text-slate-600">
+          <p className="mt-2 text-center text-slate-600 text-sm sm:text-base">
             Please sign in with your provided credentials.
           </p>
         </div>
@@ -108,6 +116,17 @@ const LoginPage: React.FC = () => {
             </button>
           </div>
         </form>
+        <div className="mt-6 text-center">
+          <p className="text-sm text-slate-500">
+            If you face any difficulties, contact{' '}
+            <a 
+              href="mailto:support.nextmile@crashfreeindia.org" 
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              support.nextmile@crashfreeindia.org
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
