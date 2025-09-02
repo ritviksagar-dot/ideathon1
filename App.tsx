@@ -8,6 +8,7 @@ import ReviewForm from './components/ReviewForm';
 import MainLayout from './components/MainLayout';
 import DashboardSkeleton from './components/DashboardSkeleton';
 import Toast from './components/Toast';
+import ErrorBoundary from './components/ErrorBoundary';
 import { CRITERIA } from './constants';
 import type { Review, CriterionScore, ToastData } from './types';
 
@@ -87,31 +88,39 @@ const AuthenticatedApp = () => {
 
   return (
     <>
-      <MainLayout>
-        {selectedReview && !isAdmin ? (
-          <ReviewForm
-            review={selectedReview}
-            team={selectedTeam} 
-            criteria={CRITERIA}
-            onBack={handleBackToDashboard}
-            onSaveReview={handleSaveReview}
-          />
-        ) : isAdmin ? (
-          <AdminDashboard
-            leaderboardData={appData.leaderboardData}
-            mentorProgressData={appData.mentorProgressData}
-            adminCommentsData={appData.adminCommentsData}
-            exportRankingsToCSV={appData.exportRankingsToCSV}
-            exportCommentsToCSV={appData.exportCommentsToCSV}
-          />
-        ) : (
-          <MentorDashboard
-            assignedReviews={appData.getReviewsForMentor(user!.id)}
-            teams={appData.teams}
-            onSelectReview={handleSelectReview}
-          />
-        )}
-      </MainLayout>
+      <ErrorBoundary>
+        <MainLayout>
+          {selectedReview && !isAdmin ? (
+            <ErrorBoundary>
+              <ReviewForm
+                review={selectedReview}
+                team={selectedTeam} 
+                criteria={CRITERIA}
+                onBack={handleBackToDashboard}
+                onSaveReview={handleSaveReview}
+              />
+            </ErrorBoundary>
+          ) : isAdmin ? (
+            <ErrorBoundary>
+              <AdminDashboard
+                leaderboardData={appData.leaderboardData}
+                mentorProgressData={appData.mentorProgressData}
+                adminCommentsData={appData.adminCommentsData}
+                exportRankingsToCSV={appData.exportRankingsToCSV}
+                exportCommentsToCSV={appData.exportCommentsToCSV}
+              />
+            </ErrorBoundary>
+          ) : (
+            <ErrorBoundary>
+              <MentorDashboard
+                assignedReviews={appData.getReviewsForMentor(user!.id)}
+                teams={appData.teams}
+                onSelectReview={handleSelectReview}
+              />
+            </ErrorBoundary>
+          )}
+        </MainLayout>
+      </ErrorBoundary>
       <Toast toast={currentToast} onClose={handleCloseToast} />
     </>
   );

@@ -71,37 +71,71 @@ export const useAppData = (user: User | null, showToast: (data: ToastData) => vo
           setReviews(reviewsResult.data || []);
           setMentors(mentorsResult.data || []);
         } else {
-          // Load mentor-specific data
-          const reviewsPromise = Promise.race([
-            supabaseClient.from('reviews').select('*').eq('mentorId', user.id),
-            new Promise<{ data: null; error: { message: string } }>((_, reject) => 
-              setTimeout(() => reject({ data: null, error: { message: 'Reviews query timeout' } }), 10000)
-            )
-          ]);
+          // Load mentor-specific data with retry logic
+          let mentorReviews = null;
+          let reviewsError = null;
+          
+          // Retry logic for reviews
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              const reviewsPromise = Promise.race([
+                supabaseClient.from('reviews').select('*').eq('mentorId', user.id),
+                new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+                  setTimeout(() => reject({ data: null, error: { message: 'Reviews query timeout' } }), 15000)
+                )
+              ]);
 
-          const { data: mentorReviews, error: reviewsError } = await reviewsPromise;
-          if (reviewsError) throw new Error(`Failed to load your reviews: ${reviewsError.message}`);
+              const result = await reviewsPromise;
+              mentorReviews = result.data;
+              reviewsError = result.error;
+              break; // Success, exit retry loop
+            } catch (e: any) {
+              reviewsError = e;
+              if (attempt === 3) break; // Last attempt failed
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+            }
+          }
+
+          if (reviewsError) throw new Error(`Failed to load your reviews after 3 attempts: ${reviewsError.message}`);
 
           if (mentorReviews && mentorReviews.length > 0) {
             setReviews(mentorReviews);
-            const teamIds = [...new Set(mentorReviews.map(r => r.teamId))];
+            const teamIds = [...new Set(mentorReviews.map(r => r.teamId))] as string[];
             
-            const teamsPromise = Promise.race([
-              supabaseClient.from('teams').select('*').in('id', teamIds),
-              new Promise<{ data: null; error: { message: string } }>((_, reject) => 
-                setTimeout(() => reject({ data: null, error: { message: 'Teams query timeout' } }), 10000)
-              )
-            ]);
+            // Retry logic for teams
+            let associatedTeams = null;
+            let teamsError = null;
+            
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                const teamsPromise = Promise.race([
+                  supabaseClient.from('teams').select('*').in('id', teamIds),
+                  new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+                    setTimeout(() => reject({ data: null, error: { message: 'Teams query timeout' } }), 15000)
+                  )
+                ]);
 
-            const { data: associatedTeams, error: teamsError } = await teamsPromise;
-            if (teamsError) throw new Error(`Failed to load team data: ${teamsError.message}`);
+                const result = await teamsPromise;
+                associatedTeams = result.data;
+                teamsError = result.error;
+                break; // Success, exit retry loop
+              } catch (e: any) {
+                teamsError = e;
+                if (attempt === 3) break; // Last attempt failed
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+              }
+            }
             
+            if (teamsError) throw new Error(`Failed to load team data after 3 attempts: ${teamsError.message}`);
             setTeams(associatedTeams || []);
           } else {
             // No reviews assigned - set empty arrays
             setReviews([]);
             setTeams([]);
           }
+          
+          // Load minimal mentor data for progress tracking
+          setMentors([userProfile]);
         }
       } catch (e: any) {
         setError(e.message);
